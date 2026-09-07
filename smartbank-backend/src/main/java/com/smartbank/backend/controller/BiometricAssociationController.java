@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/biometric")
-@CrossOrigin(origins = "*")
 public class BiometricAssociationController {
 
     private final BiometricAssociationService biometricService;
