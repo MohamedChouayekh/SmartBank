@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+
+import '../services/api_service.dart';
 
 class TransferRecord {
   final int id;
@@ -34,17 +33,32 @@ class OwnedAccount {
     required this.balance,
   });
 
-  factory OwnedAccount.fromJson(Map<String, dynamic> json) {
+  factory OwnedAccount.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return OwnedAccount(
-      id: int.tryParse((json['id'] ?? '').toString()) ?? 0,
-      accountNumber: (json['accountNumber'] ?? '').toString().trim(),
-      type: (json['type'] ?? '').toString().trim().toUpperCase(),
-      balance: json['balance'] is num
-          ? (json['balance'] as num).toDouble()
-          : double.tryParse(
-                (json['balance'] ?? '0').toString(),
-              ) ??
-              0.0,
+      id: int.tryParse(
+            (json['id'] ?? '').toString(),
+          ) ??
+          0,
+      accountNumber:
+          (json['accountNumber'] ?? '')
+              .toString()
+              .trim(),
+      type:
+          (json['type'] ?? '')
+              .toString()
+              .trim()
+              .toUpperCase(),
+      balance:
+          json['balance'] is num
+              ? (json['balance'] as num)
+                  .toDouble()
+              : double.tryParse(
+                    (json['balance'] ?? '0')
+                        .toString(),
+                  ) ??
+                  0.0,
     );
   }
 
@@ -83,19 +97,31 @@ class TransfersScreen extends StatefulWidget {
   });
 
   @override
-  State<TransfersScreen> createState() => TransfersScreenState();
+  State<TransfersScreen> createState() =>
+      TransfersScreenState();
 }
 
 class TransfersScreenState extends State<TransfersScreen>
     with WidgetsBindingObserver {
-  static const String baseUrl = 'http://192.168.1.155:8080';
+  // =========================================================
+  // API
+  // =========================================================
 
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final ApiService _apiService = ApiService();
 
-  final TextEditingController _beneficiaryAccountController =
+  // =========================================================
+  // FORMULAIRES
+  // =========================================================
+
+  final GlobalKey<FormState> _formKey =
+      GlobalKey<FormState>();
+
+  final TextEditingController
+      _beneficiaryAccountController =
       TextEditingController();
 
-  final TextEditingController _amountController =
+  final TextEditingController
+      _amountController =
       TextEditingController();
 
   bool _isLoading = false;
@@ -111,6 +137,10 @@ class TransfersScreenState extends State<TransfersScreen>
   String? _beneficiaryAccountType;
 
   List<TransferRecord> _transferHistory = [];
+
+  // =========================================================
+  // INIT
+  // =========================================================
 
   @override
   void initState() {
@@ -147,6 +177,8 @@ class TransfersScreenState extends State<TransfersScreen>
 
     _beneficiaryAccountController.dispose();
     _amountController.dispose();
+
+    _apiService.dispose();
 
     super.dispose();
   }
@@ -198,10 +230,8 @@ class TransfersScreenState extends State<TransfersScreen>
 
   Future<void> _loadCurrentAccount() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/api/accounts/user/${widget.userId}',
-        ),
+      final response = await _apiService.get(
+        '/api/accounts/user/${widget.userId}',
       );
 
       if (!mounted) return;
@@ -212,7 +242,8 @@ class TransfersScreenState extends State<TransfersScreen>
         );
       }
 
-      final decoded = jsonDecode(response.body);
+      final decoded =
+          _apiService.decodeResponse(response);
 
       if (decoded is! List) {
         throw Exception(
@@ -221,8 +252,12 @@ class TransfersScreenState extends State<TransfersScreen>
       }
 
       final accounts = decoded
-          .whereType<Map<String, dynamic>>()
-          .map(OwnedAccount.fromJson)
+          .whereType<Map>()
+          .map(
+            (item) => OwnedAccount.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
           .toList();
 
       final currentAccounts = accounts
@@ -234,9 +269,10 @@ class TransfersScreenState extends State<TransfersScreen>
       setState(() {
         _accounts = accounts;
 
-        _currentAccount = currentAccounts.isEmpty
-            ? null
-            : currentAccounts.first;
+        _currentAccount =
+            currentAccounts.isEmpty
+                ? null
+                : currentAccounts.first;
 
         _isLoadingAccounts = false;
       });
@@ -269,10 +305,8 @@ class TransfersScreenState extends State<TransfersScreen>
     });
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/api/transactions/user/${widget.userId}',
-        ),
+      final response = await _apiService.get(
+        '/api/transactions/user/${widget.userId}',
       );
 
       if (!mounted) return;
@@ -283,7 +317,8 @@ class TransfersScreenState extends State<TransfersScreen>
         );
       }
 
-      final decoded = jsonDecode(response.body);
+      final decoded =
+          _apiService.decodeResponse(response);
 
       if (decoded is! List) {
         throw Exception(
@@ -291,50 +326,64 @@ class TransfersScreenState extends State<TransfersScreen>
         );
       }
 
-      final transfers = <TransferRecord>[];
+      final transfers =
+          <TransferRecord>[];
 
       for (final item in decoded) {
-        if (item is! Map<String, dynamic>) {
+        if (item is! Map) {
           continue;
         }
 
-        final type = (item['type'] ?? '')
-            .toString()
-            .trim()
-            .toUpperCase();
+        final map =
+            Map<String, dynamic>.from(item);
+
+        final type =
+            (map['type'] ?? '')
+                .toString()
+                .trim()
+                .toUpperCase();
 
         if (type != 'TRANSFER_OUT' &&
             type != 'TRANSFER_IN') {
           continue;
         }
 
-        final id = int.tryParse(
-              (item['id'] ?? '').toString(),
+        final id =
+            int.tryParse(
+              (map['id'] ?? '')
+                  .toString(),
             ) ??
             0;
 
-        final amount = item['amount'] is num
-            ? (item['amount'] as num).toDouble()
-            : double.tryParse(
-                  (item['amount'] ?? '0').toString(),
-                ) ??
-                0.0;
+        final amount =
+            map['amount'] is num
+                ? (map['amount'] as num)
+                    .toDouble()
+                : double.tryParse(
+                      (map['amount'] ?? '0')
+                          .toString(),
+                    ) ??
+                    0.0;
 
         final label =
-            (item['label'] ?? '').toString().trim();
+            (map['label'] ?? '')
+                .toString()
+                .trim();
 
         final relatedAccount =
-            (item['relatedAccountNumber'] ?? '')
+            (map['relatedAccountNumber'] ?? '')
                 .toString()
                 .trim();
 
         final createdAt =
-            (item['createdAt'] ?? '').toString();
+            (map['createdAt'] ?? '')
+                .toString();
 
         DateTime date;
 
         try {
-          date = DateTime.parse(createdAt);
+          date =
+              DateTime.parse(createdAt);
         } catch (_) {
           date = DateTime.now();
         }
@@ -343,7 +392,8 @@ class TransfersScreenState extends State<TransfersScreen>
           transfers.add(
             TransferRecord(
               id: id,
-              beneficiary: _cleanTransferLabel(
+              beneficiary:
+                  _cleanTransferLabel(
                 label,
                 relatedAccount,
                 true,
@@ -359,7 +409,8 @@ class TransfersScreenState extends State<TransfersScreen>
           transfers.add(
             TransferRecord(
               id: id,
-              beneficiary: _cleanTransferLabel(
+              beneficiary:
+                  _cleanTransferLabel(
                 label,
                 relatedAccount,
                 false,
@@ -404,17 +455,26 @@ class TransfersScreenState extends State<TransfersScreen>
     bool outgoing,
   ) {
     if (label.isNotEmpty) {
-      final lower = label.toLowerCase();
+      final lower =
+          label.toLowerCase();
 
-      if (lower.startsWith('virement vers ')) {
+      if (lower.startsWith(
+        'virement vers ',
+      )) {
         return label
-            .substring('Virement vers '.length)
+            .substring(
+              'Virement vers '.length,
+            )
             .trim();
       }
 
-      if (lower.startsWith('virement de ')) {
+      if (lower.startsWith(
+        'virement de ',
+      )) {
         return label
-            .substring('Virement de '.length)
+            .substring(
+              'Virement de '.length,
+            )
             .trim();
       }
 
@@ -455,7 +515,8 @@ class TransfersScreenState extends State<TransfersScreen>
     }
 
     for (final account in _accounts) {
-      if (account.accountNumber.toUpperCase() ==
+      if (account.accountNumber
+              .toUpperCase() ==
           text) {
         return 'Impossible de faire un virement vers votre propre compte.';
       }
@@ -465,17 +526,19 @@ class TransfersScreenState extends State<TransfersScreen>
   }
 
   // =========================================================
-  // VÉRIFICATION DU BÉNÉFICIAIRE
+  // VÉRIFICATION BÉNÉFICIAIRE
   // =========================================================
 
   Future<void> _verifyBeneficiary() async {
     final accountNumber =
-        _beneficiaryAccountController.text
+        _beneficiaryAccountController
+            .text
             .trim()
             .toUpperCase();
 
     if (accountNumber.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Entrez d’abord un numéro de compte.',
@@ -490,7 +553,8 @@ class TransfersScreenState extends State<TransfersScreen>
     if (!RegExp(
       r'^TN[A-Z0-9]{6,}$',
     ).hasMatch(accountNumber)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Numéro de compte invalide.',
@@ -504,7 +568,8 @@ class TransfersScreenState extends State<TransfersScreen>
 
     final isOwnAccount = _accounts.any(
       (account) =>
-          account.accountNumber.toUpperCase() ==
+          account.accountNumber
+              .toUpperCase() ==
           accountNumber,
     );
 
@@ -514,7 +579,8 @@ class TransfersScreenState extends State<TransfersScreen>
         _beneficiaryAccountType = null;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Impossible de faire un virement vers votre propre compte. '
@@ -534,25 +600,32 @@ class TransfersScreenState extends State<TransfersScreen>
     });
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/api/accounts/lookup/$accountNumber',
-        ),
+      final response =
+          await _apiService.get(
+        '/api/accounts/lookup/$accountNumber',
       );
 
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
+        final decoded =
+            _apiService.decodeResponse(
+          response,
+        );
 
-        if (decoded is Map<String, dynamic>) {
+        if (decoded is Map) {
+          final map =
+              Map<String, dynamic>.from(
+            decoded,
+          );
+
           final fullName =
-              (decoded['fullName'] ?? '')
+              (map['fullName'] ?? '')
                   .toString()
                   .trim();
 
           final accountType =
-              (decoded['type'] ?? '')
+              (map['type'] ?? '')
                   .toString()
                   .trim()
                   .toUpperCase();
@@ -592,11 +665,14 @@ class TransfersScreenState extends State<TransfersScreen>
           }
 
           setState(() {
-            _beneficiaryName = fullName;
-            _beneficiaryAccountType = 'CURRENT';
+            _beneficiaryName =
+                fullName;
+            _beneficiaryAccountType =
+                'CURRENT';
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context)
+              .showSnackBar(
             SnackBar(
               content: Text(
                 'Compte courant vérifié : $fullName',
@@ -611,7 +687,8 @@ class TransfersScreenState extends State<TransfersScreen>
           _beneficiaryAccountType = null;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
           const SnackBar(
             content: Text(
               'Aucun compte trouvé avec ce numéro.',
@@ -632,7 +709,8 @@ class TransfersScreenState extends State<TransfersScreen>
         _beneficiaryAccountType = null;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Impossible de vérifier ce compte. Vérifiez que Spring Boot est démarré.',
@@ -658,10 +736,12 @@ class TransfersScreenState extends State<TransfersScreen>
       return;
     }
 
-    final sourceAccount = _currentAccount;
+    final sourceAccount =
+        _currentAccount;
 
     if (sourceAccount == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Aucun compte courant disponible.',
@@ -675,7 +755,8 @@ class TransfersScreenState extends State<TransfersScreen>
 
     if (_beneficiaryName == null ||
         _beneficiaryName!.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Veuillez vérifier le bénéficiaire avant de continuer.',
@@ -687,8 +768,10 @@ class TransfersScreenState extends State<TransfersScreen>
       return;
     }
 
-    if (_beneficiaryAccountType != 'CURRENT') {
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (_beneficiaryAccountType !=
+        'CURRENT') {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Le compte du bénéficiaire doit être un compte courant.',
@@ -701,16 +784,19 @@ class TransfersScreenState extends State<TransfersScreen>
     }
 
     final beneficiaryAccount =
-        _beneficiaryAccountController.text
+        _beneficiaryAccountController
+            .text
             .trim()
             .toUpperCase();
 
     if (_accounts.any(
       (account) =>
-          account.accountNumber.toUpperCase() ==
+          account.accountNumber
+              .toUpperCase() ==
           beneficiaryAccount,
     )) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Ce compte appartient à votre utilisateur. '
@@ -732,7 +818,8 @@ class TransfersScreenState extends State<TransfersScreen>
         0.0;
 
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Montant invalide.',
@@ -744,8 +831,10 @@ class TransfersScreenState extends State<TransfersScreen>
       return;
     }
 
-    if (amount > sourceAccount.balance) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (amount >
+        sourceAccount.balance) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Solde insuffisant sur votre compte courant.',
@@ -765,35 +854,34 @@ class TransfersScreenState extends State<TransfersScreen>
     });
 
     try {
-      final response = await http.post(
-        Uri.parse(
-          '$baseUrl/api/transactions/transfer',
-        ),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final response =
+          await _apiService.post(
+        '/api/transactions/transfer',
+        body: {
           'fromAccountNumber':
               sourceAccount.accountNumber,
           'toAccountNumber':
               beneficiaryAccount,
           'amount': amount,
           'label': label,
-        }),
+        },
       );
 
       if (!mounted) return;
 
       Map<String, dynamic> data = {};
 
-      try {
-        final decoded =
-            jsonDecode(response.body);
+      final decoded =
+          _apiService.decodeResponse(
+        response,
+      );
 
-        if (decoded is Map<String, dynamic>) {
-          data = decoded;
-        }
-      } catch (_) {}
+      if (decoded is Map) {
+        data =
+            Map<String, dynamic>.from(
+          decoded,
+        );
+      }
 
       if (response.statusCode == 200) {
         await _loadCurrentAccount();
@@ -804,26 +892,31 @@ class TransfersScreenState extends State<TransfersScreen>
         final newCourant =
             _currentAccount?.balance ??
                 double.tryParse(
-                  (data['newSourceBalance'] ?? '')
+                  (data['newSourceBalance'] ??
+                          '')
                       .toString(),
                 ) ??
                 0.0;
 
-        final savingsAccounts = _accounts
-            .where(
-              (account) =>
-                  account.type == 'SAVINGS',
-            )
-            .toList();
+        final savingsAccounts =
+            _accounts
+                .where(
+                  (account) =>
+                      account.type ==
+                      'SAVINGS',
+                )
+                .toList();
 
         final newEpargne =
             savingsAccounts.isNotEmpty
                 ? savingsAccounts.first.balance
                 : widget.epargneBalance;
 
-        final record = TransferRecord(
+        final record =
+            TransferRecord(
           id: int.tryParse(
-                (data['transactionId'] ?? '')
+                (data['transactionId'] ??
+                        '')
                     .toString(),
               ) ??
               DateTime.now()
@@ -861,9 +954,11 @@ class TransfersScreenState extends State<TransfersScreen>
 
         setState(() {
           _amountController.clear();
-          _beneficiaryAccountController.clear();
+          _beneficiaryAccountController
+              .clear();
           _beneficiaryName = null;
-          _beneficiaryAccountType = null;
+          _beneficiaryAccountType =
+              null;
         });
 
         _showSuccessDialog(
@@ -875,10 +970,11 @@ class TransfersScreenState extends State<TransfersScreen>
       } else {
         final message =
             (data['message'] ??
-                    'Impossible d\'effectuer le virement.')
+                    'Impossible d’effectuer le virement.')
                 .toString();
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
           SnackBar(
             content: Text(message),
             backgroundColor: Colors.red,
@@ -892,7 +988,8 @@ class TransfersScreenState extends State<TransfersScreen>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Impossible de contacter le serveur. Vérifiez que Spring Boot est démarré.',
@@ -926,7 +1023,8 @@ class TransfersScreenState extends State<TransfersScreen>
             children: [
               Icon(
                 Icons.check_circle,
-                color: Colors.green.shade600,
+                color:
+                    Colors.green.shade600,
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -937,30 +1035,41 @@ class TransfersScreenState extends State<TransfersScreen>
             ],
           ),
           content: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+                MainAxisSize.min,
             crossAxisAlignment:
                 CrossAxisAlignment.start,
             children: [
               const Text('Montant'),
               Text(
                 '${amount.toStringAsFixed(3)} TND',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+                style:
+                    const TextStyle(
+                  fontWeight:
+                      FontWeight.bold,
                   fontSize: 18,
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(
+                height: 14,
+              ),
               const Text('Bénéficiaire'),
               Text(
                 beneficiaryName.isNotEmpty
                     ? beneficiaryName
                     : 'Bénéficiaire',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+                style:
+                    const TextStyle(
+                  fontWeight:
+                      FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 14),
-              const Text('Compte courant'),
+              const SizedBox(
+                height: 14,
+              ),
+              const Text(
+                'Compte courant',
+              ),
               Text(
                 beneficiaryAccountNumber,
               ),
@@ -969,9 +1078,12 @@ class TransfersScreenState extends State<TransfersScreen>
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(dialogContext);
+                Navigator.pop(
+                  dialogContext,
+                );
               },
-              child: const Text('Fermer'),
+              child:
+                  const Text('Fermer'),
             ),
           ],
         );
@@ -979,7 +1091,9 @@ class TransfersScreenState extends State<TransfersScreen>
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(
+    DateTime date,
+  ) {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year} à '
@@ -992,7 +1106,9 @@ class TransfersScreenState extends State<TransfersScreen>
   // =========================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -1002,8 +1118,11 @@ class TransfersScreenState extends State<TransfersScreen>
           IconButton(
             tooltip: 'Actualiser',
             onPressed:
-                _isLoading ? null : _refreshData,
-            icon: const Icon(
+                _isLoading
+                    ? null
+                    : _refreshData,
+            icon:
+                const Icon(
               Icons.refresh,
             ),
           ),
@@ -1011,40 +1130,57 @@ class TransfersScreenState extends State<TransfersScreen>
       ),
       body: RefreshIndicator(
         onRefresh: _refreshData,
-        child: SingleChildScrollView(
+        child:
+            SingleChildScrollView(
           physics:
               const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding:
+              const EdgeInsets.all(20),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
               children: [
                 Container(
-                  width: double.infinity,
+                  width:
+                      double.infinity,
                   padding:
-                      const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                      const EdgeInsets.all(
+                    14,
+                  ),
+                  decoration:
+                      BoxDecoration(
+                    color:
+                        Colors.blue.shade50,
                     borderRadius:
-                        BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Colors.blue.shade200,
+                        BorderRadius.circular(
+                      10,
+                    ),
+                    border:
+                        Border.all(
+                      color:
+                          Colors.blue.shade200,
                     ),
                   ),
-                  child: const Row(
+                  child:
+                      const Row(
                     crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        CrossAxisAlignment
+                            .start,
                     children: [
                       Icon(
-                        Icons.person_outline,
+                        Icons
+                            .person_outline,
                       ),
                       SizedBox(width: 10),
                       Expanded(
-                        child: Text(
+                        child:
+                            Text(
                           'Cette page permet uniquement d’envoyer de l’argent vers le compte courant d’un autre utilisateur.',
-                          style: TextStyle(
+                          style:
+                              TextStyle(
                             fontWeight:
                                 FontWeight.w500,
                           ),
@@ -1053,80 +1189,114 @@ class TransfersScreenState extends State<TransfersScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(
+                  height: 22,
+                ),
                 const Text(
                   'Compte à débiter',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                  style:
+                      TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
                 if (_isLoadingAccounts)
                   const Center(
                     child:
                         CircularProgressIndicator(),
                   )
-                else if (_currentAccount == null)
+                else if (_currentAccount ==
+                    null)
                   Container(
-                    width: double.infinity,
+                    width:
+                        double.infinity,
                     padding:
-                        const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius:
-                          BorderRadius.circular(10),
+                        const EdgeInsets.all(
+                      14,
                     ),
-                    child: const Text(
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          Colors.red.shade50,
+                      borderRadius:
+                          BorderRadius.circular(
+                        10,
+                      ),
+                    ),
+                    child:
+                        const Text(
                       'Aucun compte courant disponible pour effectuer un virement.',
                     ),
                   )
                 else
                   Container(
-                    width: double.infinity,
+                    width:
+                        double.infinity,
                     padding:
-                        const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
+                        const EdgeInsets.all(
+                      14,
+                    ),
+                    decoration:
+                        BoxDecoration(
                       borderRadius:
-                          BorderRadius.circular(12),
-                      border: Border.all(
+                          BorderRadius.circular(
+                        12,
+                      ),
+                      border:
+                          Border.all(
                         color:
-                            Colors.grey.shade300,
+                            Colors.grey
+                                .shade300,
                       ),
                     ),
-                    child: Row(
+                    child:
+                        Row(
                       children: [
                         const Icon(
                           Icons
                               .account_balance_outlined,
                           size: 30,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(
+                          width: 12,
+                        ),
                         Expanded(
-                          child: Column(
+                          child:
+                              Column(
                             crossAxisAlignment:
                                 CrossAxisAlignment
                                     .start,
                             children: [
                               const Text(
                                 'Compte courant',
-                                style: TextStyle(
+                                style:
+                                    TextStyle(
                                   fontWeight:
                                       FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(
+                                height: 3,
+                              ),
                               Text(
                                 _currentAccount!
                                     .accountNumber,
-                                style: TextStyle(
-                                  fontSize: 12,
+                                style:
+                                    TextStyle(
+                                  fontSize:
+                                      12,
                                   color: Colors
                                       .grey
                                       .shade600,
                                 ),
                               ),
-                              const SizedBox(height: 5),
+                              const SizedBox(
+                                height: 5,
+                              ),
                               Text(
                                 'Solde disponible : ${_currentAccount!.balance.toStringAsFixed(3)} TND',
                                 style:
@@ -1141,33 +1311,45 @@ class TransfersScreenState extends State<TransfersScreen>
                       ],
                     ),
                   ),
-                const SizedBox(height: 24),
+                const SizedBox(
+                  height: 24,
+                ),
                 const Text(
                   'Compte du bénéficiaire',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                  style:
+                      TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
                 TextFormField(
                   controller:
                       _beneficiaryAccountController,
-                  enabled: !_isLoading,
+                  enabled:
+                      !_isLoading,
                   textCapitalization:
-                      TextCapitalization.characters,
-                  onChanged: (value) {
-                    if (_beneficiaryName != null ||
+                      TextCapitalization
+                          .characters,
+                  onChanged:
+                      (value) {
+                    if (_beneficiaryName !=
+                            null ||
                         _beneficiaryAccountType !=
                             null) {
                       setState(() {
-                        _beneficiaryName = null;
+                        _beneficiaryName =
+                            null;
                         _beneficiaryAccountType =
                             null;
                       });
                     }
                   },
-                  decoration: InputDecoration(
+                  decoration:
+                      InputDecoration(
                     labelText:
                         'Numéro de compte',
                     hintText:
@@ -1176,11 +1358,13 @@ class TransfersScreenState extends State<TransfersScreen>
                         'Uniquement un compte courant appartenant à un autre utilisateur',
                     border:
                         const OutlineInputBorder(),
-                    prefixIcon: const Icon(
+                    prefixIcon:
+                        const Icon(
                       Icons
                           .account_balance_wallet_outlined,
                     ),
-                    suffixIcon: TextButton(
+                    suffixIcon:
+                        TextButton(
                       onPressed:
                           _isVerifyingBeneficiary
                               ? null
@@ -1192,7 +1376,8 @@ class TransfersScreenState extends State<TransfersScreen>
                                   height: 16,
                                   child:
                                       CircularProgressIndicator(
-                                    strokeWidth: 2,
+                                    strokeWidth:
+                                        2,
                                   ),
                                 )
                               : const Text(
@@ -1203,22 +1388,35 @@ class TransfersScreenState extends State<TransfersScreen>
                   validator:
                       _validateBeneficiaryAccount,
                 ),
-                if (_beneficiaryName != null) ...[
-                  const SizedBox(height: 10),
+                if (_beneficiaryName !=
+                    null) ...[
+                  const SizedBox(
+                    height: 10,
+                  ),
                   Container(
-                    width: double.infinity,
+                    width:
+                        double.infinity,
                     padding:
-                        const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                        const EdgeInsets.all(
+                      12,
+                    ),
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          Colors.green.shade50,
                       borderRadius:
-                          BorderRadius.circular(10),
-                      border: Border.all(
+                          BorderRadius.circular(
+                        10,
+                      ),
+                      border:
+                          Border.all(
                         color:
-                            Colors.green.shade200,
+                            Colors.green
+                                .shade200,
                       ),
                     ),
-                    child: Row(
+                    child:
+                        Row(
                       children: [
                         Icon(
                           Icons.check_circle,
@@ -1226,16 +1424,20 @@ class TransfersScreenState extends State<TransfersScreen>
                               Colors.green.shade700,
                           size: 22,
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(
+                          width: 8,
+                        ),
                         Expanded(
-                          child: Column(
+                          child:
+                              Column(
                             crossAxisAlignment:
                                 CrossAxisAlignment
                                     .start,
                             children: [
                               Text(
                                 _beneficiaryName!,
-                                style: TextStyle(
+                                style:
+                                    TextStyle(
                                   color: Colors
                                       .green
                                       .shade900,
@@ -1244,11 +1446,14 @@ class TransfersScreenState extends State<TransfersScreen>
                                 ),
                               ),
                               const SizedBox(
-                                  height: 3),
+                                height: 3,
+                              ),
                               const Text(
                                 'Compte courant vérifié',
-                                style: TextStyle(
-                                  fontSize: 12,
+                                style:
+                                    TextStyle(
+                                  fontSize:
+                                      12,
                                 ),
                               ),
                             ],
@@ -1258,36 +1463,49 @@ class TransfersScreenState extends State<TransfersScreen>
                     ),
                   ),
                 ],
-                const SizedBox(height: 22),
+                const SizedBox(
+                  height: 22,
+                ),
                 const Text(
                   'Montant',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                  style:
+                      TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
                 TextFormField(
-                  controller: _amountController,
-                  enabled: !_isLoading,
+                  controller:
+                      _amountController,
+                  enabled:
+                      !_isLoading,
                   keyboardType:
                       const TextInputType
                           .numberWithOptions(
-                    decimal: true,
+                    decimal:
+                        true,
                   ),
                   decoration:
                       const InputDecoration(
-                    labelText: 'Montant (TND)',
+                    labelText:
+                        'Montant (TND)',
                     border:
                         OutlineInputBorder(),
-                    prefixIcon: Icon(
+                    prefixIcon:
+                        Icon(
                       Icons
                           .account_balance_wallet,
                     ),
                   ),
-                  validator: (value) {
+                  validator:
+                      (value) {
                     if (value == null ||
-                        value.trim().isEmpty) {
+                        value.trim()
+                            .isEmpty) {
                       return 'Saisissez le montant.';
                     }
 
@@ -1301,7 +1519,8 @@ class TransfersScreenState extends State<TransfersScreen>
                           ),
                     );
 
-                    if (amount == null ||
+                    if (amount ==
+                            null ||
                         amount <= 0) {
                       return 'Montant invalide.';
                     }
@@ -1317,76 +1536,99 @@ class TransfersScreenState extends State<TransfersScreen>
                     return null;
                   },
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(
+                  height: 28,
+                ),
                 SizedBox(
-                  width: double.infinity,
+                  width:
+                      double.infinity,
                   height: 50,
-                  child: ElevatedButton.icon(
+                  child:
+                      ElevatedButton.icon(
                     onPressed:
                         _isLoading ||
                                 _currentAccount ==
                                     null
                             ? null
                             : _executeTransfer,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child:
-                                CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.send,
-                          ),
-                    label: Text(
+                    icon:
+                        _isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(
+                                  strokeWidth:
+                                      2,
+                                  color:
+                                      Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.send,
+                              ),
+                    label:
+                        Text(
                       _isLoading
                           ? 'Virement en cours...'
                           : 'Effectuer le virement',
                       style:
                           const TextStyle(
-                        fontSize: 16,
+                        fontSize:
+                            16,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 35),
+                const SizedBox(
+                  height: 35,
+                ),
                 const Divider(),
-                const SizedBox(height: 15),
+                const SizedBox(
+                  height: 15,
+                ),
                 Text(
                   'Historique des virements récents',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                        fontWeight:
-                            FontWeight.bold,
-                      ),
+                  style:
+                      Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(
+                  height: 12,
+                ),
                 if (_isLoadingHistory)
                   const Padding(
                     padding:
                         EdgeInsets.symmetric(
-                      vertical: 25,
+                      vertical:
+                          25,
                     ),
-                    child: Center(
+                    child:
+                        Center(
                       child:
                           CircularProgressIndicator(),
                     ),
                   )
-                else if (_transferHistory.isEmpty)
+                else if (_transferHistory
+                    .isEmpty)
                   const Padding(
                     padding:
                         EdgeInsets.symmetric(
-                      vertical: 10,
+                      vertical:
+                          10,
                     ),
-                    child: Text(
+                    child:
+                        Text(
                       'Aucun virement effectué ou reçu pour le moment.',
-                      style: TextStyle(
-                        color: Colors.grey,
+                      style:
+                          TextStyle(
+                        color:
+                            Colors.grey,
                         fontStyle:
                             FontStyle.italic,
                       ),
@@ -1394,15 +1636,18 @@ class TransfersScreenState extends State<TransfersScreen>
                   )
                 else
                   ListView.builder(
-                    shrinkWrap: true,
+                    shrinkWrap:
+                        true,
                     physics:
                         const NeverScrollableScrollPhysics(),
                     itemCount:
-                        _transferHistory.length,
+                        _transferHistory
+                            .length,
                     itemBuilder:
                         (context, index) {
                       final item =
-                          _transferHistory[index];
+                          _transferHistory[
+                              index];
 
                       final sign =
                           item.isIncoming
@@ -1415,10 +1660,13 @@ class TransfersScreenState extends State<TransfersScreen>
                               : Colors.red;
 
                       return Card(
-                        elevation: 1,
+                        elevation:
+                            1,
                         margin:
-                            const EdgeInsets.only(
-                          bottom: 10,
+                            const EdgeInsets
+                                .only(
+                          bottom:
+                              10,
                         ),
                         shape:
                             RoundedRectangleBorder(
@@ -1427,7 +1675,8 @@ class TransfersScreenState extends State<TransfersScreen>
                             8,
                           ),
                         ),
-                        child: ListTile(
+                        child:
+                            ListTile(
                           leading:
                               CircleAvatar(
                             backgroundColor:
@@ -1438,7 +1687,8 @@ class TransfersScreenState extends State<TransfersScreen>
                                     : Colors
                                         .red
                                         .shade100,
-                            child: Icon(
+                            child:
+                                Icon(
                               item.isIncoming
                                   ? Icons
                                       .arrow_downward
@@ -1446,10 +1696,12 @@ class TransfersScreenState extends State<TransfersScreen>
                                       .arrow_upward,
                               color:
                                   amountColor,
-                              size: 20,
+                              size:
+                                  20,
                             ),
                           ),
-                          title: Text(
+                          title:
+                              Text(
                             item.isIncoming
                                 ? 'Virement reçu'
                                 : 'Virement envoyé',
@@ -1457,7 +1709,8 @@ class TransfersScreenState extends State<TransfersScreen>
                                 const TextStyle(
                               fontWeight:
                                   FontWeight.w600,
-                              fontSize: 14,
+                              fontSize:
+                                  14,
                             ),
                           ),
                           subtitle:
@@ -1472,7 +1725,8 @@ class TransfersScreenState extends State<TransfersScreen>
                                     : 'Vers : ${item.beneficiary}',
                                 style:
                                     const TextStyle(
-                                  fontSize: 13,
+                                  fontSize:
+                                      13,
                                 ),
                               ),
                               Text(
@@ -1481,7 +1735,8 @@ class TransfersScreenState extends State<TransfersScreen>
                                 ),
                                 style:
                                     const TextStyle(
-                                  fontSize: 12,
+                                  fontSize:
+                                      12,
                                 ),
                               ),
                               if (item
@@ -1490,8 +1745,10 @@ class TransfersScreenState extends State<TransfersScreen>
                                 Text(
                                   item
                                       .beneficiaryAccountNumber,
-                                  style: TextStyle(
-                                    fontSize: 11,
+                                  style:
+                                      TextStyle(
+                                    fontSize:
+                                        11,
                                     color: Colors
                                         .grey
                                         .shade600,
@@ -1499,14 +1756,17 @@ class TransfersScreenState extends State<TransfersScreen>
                                 ),
                             ],
                           ),
-                          trailing: Text(
+                          trailing:
+                              Text(
                             '$sign${item.amount.toStringAsFixed(2)} TND',
-                            style: TextStyle(
+                            style:
+                                TextStyle(
                               color:
                                   amountColor,
                               fontWeight:
                                   FontWeight.bold,
-                              fontSize: 14,
+                              fontSize:
+                                  14,
                             ),
                           ),
                         ),

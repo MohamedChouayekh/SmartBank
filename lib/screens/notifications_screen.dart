@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+
+import '../services/api_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final int userId;
@@ -20,8 +20,11 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState
     extends State<NotificationsScreen>
     with WidgetsBindingObserver {
-  static const String baseUrl =
-      'http://192.168.1.155:8080';
+  // =========================================================
+  // API
+  // =========================================================
+
+  final ApiService _apiService = ApiService();
 
   static const Color blue =
       Color(0xFF0B5AA6);
@@ -48,6 +51,10 @@ class _NotificationsScreenState
   String _selectedFilter = 'ALL';
 
   Timer? _refreshTimer;
+
+  // =========================================================
+  // INIT
+  // =========================================================
 
   @override
   void initState() {
@@ -154,23 +161,18 @@ class _NotificationsScreenState
   }) async {
     try {
       final response =
-          await http
-              .get(
-                Uri.parse(
-                  '$baseUrl/api/notification-preferences/${widget.userId}',
-                ),
-              )
-              .timeout(
-                const Duration(seconds: 10),
-              );
+          await _apiService.get(
+        '/api/notification-preferences/${widget.userId}',
+      );
 
-      if (response.statusCode !=
-          200) {
+      if (response.statusCode != 200) {
         throw Exception();
       }
 
       final decoded =
-          jsonDecode(response.body);
+          _apiService.decodeResponse(
+        response,
+      );
 
       if (decoded
           is! Map<String, dynamic>) {
@@ -237,23 +239,18 @@ class _NotificationsScreenState
   }) async {
     try {
       final response =
-          await http
-              .get(
-                Uri.parse(
-                  '$baseUrl/api/notifications/user/${widget.userId}',
-                ),
-              )
-              .timeout(
-                const Duration(seconds: 10),
-              );
+          await _apiService.get(
+        '/api/notifications/user/${widget.userId}',
+      );
 
-      if (response.statusCode !=
-          200) {
+      if (response.statusCode != 200) {
         throw Exception();
       }
 
       final decoded =
-          jsonDecode(response.body);
+          _apiService.decodeResponse(
+        response,
+      );
 
       if (decoded is! List) {
         throw Exception();
@@ -342,36 +339,23 @@ class _NotificationsScreenState
 
     try {
       final response =
-          await http
-              .put(
-                Uri.parse(
-                  '$baseUrl/api/notification-preferences/${widget.userId}',
-                ),
-                headers: {
-                  'Content-Type':
-                      'application/json',
-                  'Accept':
-                      'application/json',
-                },
-                body:
-                    jsonEncode({
-                  'generalNotifications':
-                      _generalNotifications,
-                  'transfers':
-                      _transfers,
-                  'cardPayments':
-                      _cardPayments,
-                  'withdrawals':
-                      _withdrawals,
-                  'securityAlerts':
-                      _securityAlerts,
-                  'promotions':
-                      _promotions,
-                }),
-              )
-              .timeout(
-                const Duration(seconds: 10),
-              );
+          await _apiService.put(
+        '/api/notification-preferences/${widget.userId}',
+        body: {
+          'generalNotifications':
+              _generalNotifications,
+          'transfers':
+              _transfers,
+          'cardPayments':
+              _cardPayments,
+          'withdrawals':
+              _withdrawals,
+          'securityAlerts':
+              _securityAlerts,
+          'promotions':
+              _promotions,
+        },
+      );
 
       if (response.statusCode !=
           200) {
@@ -396,6 +380,10 @@ class _NotificationsScreenState
         ),
       );
     } catch (e) {
+      debugPrint(
+        'Erreur sauvegarde préférences : $e',
+      );
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context)
@@ -427,19 +415,9 @@ class _NotificationsScreenState
   ) async {
     try {
       final response =
-          await http
-              .put(
-                Uri.parse(
-                  '$baseUrl/api/notifications/$notificationId/read',
-                ),
-                headers: {
-                  'Accept':
-                      'application/json',
-                },
-              )
-              .timeout(
-                const Duration(seconds: 10),
-              );
+          await _apiService.put(
+        '/api/notifications/$notificationId/read',
+      );
 
       if (response.statusCode !=
           200) {
@@ -450,6 +428,10 @@ class _NotificationsScreenState
         showError: false,
       );
     } catch (e) {
+      debugPrint(
+        'Erreur notification lue : $e',
+      );
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context)
@@ -555,18 +537,18 @@ class _NotificationsScreenState
     return _notifications
         .where(
           (notification) {
-        final type =
-            (notification['type'] ??
-                    '')
-                .toString();
+            final type =
+                (notification['type'] ??
+                        '')
+                    .toString();
 
-        return _isNotificationAllowed(
-              type,
-            ) &&
-            _matchesSelectedFilter(
-              type,
-            );
-      },
+            return _isNotificationAllowed(
+                  type,
+                ) &&
+                _matchesSelectedFilter(
+                  type,
+                );
+          },
         )
         .toList();
   }
@@ -969,8 +951,7 @@ class _NotificationsScreenState
     required IconData icon,
   }) {
     final selected =
-        _selectedFilter ==
-            value;
+        _selectedFilter == value;
 
     return ChoiceChip(
       selected:
@@ -1081,7 +1062,6 @@ class _NotificationsScreenState
           isDark
               ? const Color(0xFF0F1723)
               : const Color(0xFFF5F7FA),
-
       appBar:
           AppBar(
         backgroundColor:
@@ -1112,7 +1092,6 @@ class _NotificationsScreenState
           ),
         ],
       ),
-
       body:
           _isLoading
               ? const Center(
@@ -1140,10 +1119,6 @@ class _NotificationsScreenState
                       crossAxisAlignment:
                           CrossAxisAlignment.start,
                       children: [
-                        // ----------------------------------
-                        // HEADER
-                        // ----------------------------------
-
                         Container(
                           width:
                               double.infinity,
@@ -1238,12 +1213,10 @@ class _NotificationsScreenState
                             ],
                           ),
                         ),
-
                         const SizedBox(
                           height:
                               22,
                         ),
-
                         Text(
                           'Notifications reçues',
                           style:
@@ -1255,12 +1228,10 @@ class _NotificationsScreenState
                                     FontWeight.w800,
                               ),
                         ),
-
                         const SizedBox(
                           height:
                               12,
                         ),
-
                         SingleChildScrollView(
                           scrollDirection:
                               Axis.horizontal,
@@ -1344,12 +1315,10 @@ class _NotificationsScreenState
                             ],
                           ),
                         ),
-
                         const SizedBox(
                           height:
                               18,
                         ),
-
                         if (!_generalNotifications)
                           Container(
                             width:
@@ -1400,7 +1369,6 @@ class _NotificationsScreenState
                               ],
                             ),
                           ),
-
                         if (_generalNotifications &&
                             visible.isEmpty)
                           Container(
@@ -1451,21 +1419,14 @@ class _NotificationsScreenState
                               ],
                             ),
                           ),
-
                         if (_generalNotifications)
                           ...visible.map(
                             _buildNotificationCard,
                           ),
-
                         const SizedBox(
                           height:
                               30,
                         ),
-
-                        // ----------------------------------
-                        // PRÉFÉRENCES
-                        // ----------------------------------
-
                         Text(
                           'Préférences',
                           style:
@@ -1477,12 +1438,10 @@ class _NotificationsScreenState
                                     FontWeight.w800,
                               ),
                         ),
-
                         const SizedBox(
                           height:
                               6,
                         ),
-
                         Text(
                           'Personnalisez l’affichage des notifications SmartBank.',
                           style:
@@ -1500,12 +1459,10 @@ class _NotificationsScreenState
                                 12.5,
                           ),
                         ),
-
                         const SizedBox(
                           height:
                               14,
                         ),
-
                         _buildSwitch(
                           title:
                               'Notifications générales',
@@ -1525,7 +1482,6 @@ class _NotificationsScreenState
                             _savePreferences();
                           },
                         ),
-
                         _buildSwitch(
                           title:
                               'Virements',
@@ -1544,7 +1500,6 @@ class _NotificationsScreenState
                             _savePreferences();
                           },
                         ),
-
                         _buildSwitch(
                           title:
                               'Paiements par carte',
@@ -1564,7 +1519,6 @@ class _NotificationsScreenState
                             _savePreferences();
                           },
                         ),
-
                         _buildSwitch(
                           title:
                               'Retraits',
@@ -1583,7 +1537,6 @@ class _NotificationsScreenState
                             _savePreferences();
                           },
                         ),
-
                         _buildSwitch(
                           title:
                               'Alertes de sécurité',
@@ -1602,7 +1555,6 @@ class _NotificationsScreenState
                             _savePreferences();
                           },
                         ),
-
                         _buildSwitch(
                           title:
                               'Promotions',
@@ -1629,12 +1581,18 @@ class _NotificationsScreenState
     );
   }
 
+  // =========================================================
+  // DISPOSE
+  // =========================================================
+
   @override
   void dispose() {
     _stopAutoRefresh();
 
     WidgetsBinding.instance
         .removeObserver(this);
+
+    _apiService.dispose();
 
     super.dispose();
   }

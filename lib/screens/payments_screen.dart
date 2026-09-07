@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+
+import '../services/api_service.dart';
 
 class PaymentItem {
   final String serviceName;
@@ -90,8 +89,11 @@ class PaymentsScreen extends StatefulWidget {
 
 class _PaymentsScreenState
     extends State<PaymentsScreen> {
-  static const String baseUrl =
-      'http://192.168.1.155:8080';
+  // =========================================================
+  // API
+  // =========================================================
+
+  final ApiService _apiService = ApiService();
 
   // =========================================================
   // COULEURS SMARTBANK
@@ -158,8 +160,7 @@ class _PaymentsScreenState
   bool _isSearchingRadar =
       false;
 
-  bool _isPayingRadar =
-      false;
+  bool _isPayingRadar = false;
 
   // =========================================================
   // LISTES
@@ -230,6 +231,7 @@ class _PaymentsScreenState
   @override
   void initState() {
     super.initState();
+
     _loadCurrentAccountNumber();
   }
 
@@ -241,32 +243,22 @@ class _PaymentsScreenState
       _loadCurrentAccountNumber() async {
     if (mounted) {
       setState(() {
-        _isLoadingAccount =
-            true;
+        _isLoadingAccount = true;
       });
     }
 
     try {
       final response =
-          await http
-              .get(
-                Uri.parse(
-                  '$baseUrl/api/accounts/user/${widget.userId}',
-                ),
-              )
-              .timeout(
-                const Duration(
-                  seconds: 10,
-                ),
-              );
+          await _apiService.get(
+        '/api/accounts/user/${widget.userId}',
+      );
 
       if (!mounted) return;
 
-      if (response.statusCode ==
-          200) {
+      if (response.statusCode == 200) {
         final data =
-            jsonDecode(
-          response.body,
+            _apiService.decodeResponse(
+          response,
         );
 
         if (data is List) {
@@ -298,8 +290,7 @@ class _PaymentsScreenState
     } finally {
       if (mounted) {
         setState(() {
-          _isLoadingAccount =
-              false;
+          _isLoadingAccount = false;
         });
       }
     }
@@ -865,23 +856,16 @@ class _PaymentsScreenState
 
     try {
       final response =
-          await http
-              .get(
-                Uri.parse(
-                  '$baseUrl/api/amendes?immatriculation=$registration',
-                ),
-              )
-              .timeout(
-                const Duration(seconds: 10),
-              );
+          await _apiService.get(
+        '/api/amendes?immatriculation=$registration',
+      );
 
       if (!mounted) return;
 
-      if (response.statusCode ==
-          200) {
+      if (response.statusCode == 200) {
         final data =
-            jsonDecode(
-          response.body,
+            _apiService.decodeResponse(
+          response,
         );
 
         final List<RadarFine>
@@ -920,6 +904,10 @@ class _PaymentsScreenState
         );
       }
     } catch (e) {
+      debugPrint(
+        'Erreur recherche radar : $e',
+      );
+
       if (!mounted) return;
 
       setState(() {
@@ -996,10 +984,8 @@ class _PaymentsScreenState
 
     try {
       final response =
-          await http.post(
-        Uri.parse(
-          '$baseUrl/api/amendes/${fine.reference}/payer',
-        ),
+          await _apiService.post(
+        '/api/amendes/${fine.reference}/payer',
       );
 
       if (!mounted) return;
@@ -1071,9 +1057,17 @@ class _PaymentsScreenState
         String message =
             'Impossible de payer cette amende.';
 
-        if (response
-            .body
-            .isNotEmpty) {
+        final decoded =
+            _apiService.decodeResponse(
+          response,
+        );
+
+        if (decoded is Map &&
+            decoded['message'] != null) {
+          message =
+              decoded['message']
+                  .toString();
+        } else if (response.body.isNotEmpty) {
           message =
               response.body;
         }
@@ -1084,6 +1078,10 @@ class _PaymentsScreenState
         );
       }
     } catch (e) {
+      debugPrint(
+        'Erreur paiement radar : $e',
+      );
+
       if (!mounted) return;
 
       _showSnack(
@@ -1555,16 +1553,9 @@ class _PaymentsScreenState
 
     try {
       final response =
-          await http.post(
-        Uri.parse(
-          '$baseUrl/api/transactions/payment',
-        ),
-        headers: {
-          'Content-Type':
-              'application/json',
-        },
-        body:
-            jsonEncode({
+          await _apiService.post(
+        '/api/transactions/payment',
+        body: {
           'accountNumber':
               _accountNumber,
           'category':
@@ -1575,7 +1566,7 @@ class _PaymentsScreenState
               reference,
           'amount':
               amount,
-        }),
+        },
       );
 
       if (!mounted) return;
@@ -1583,17 +1574,17 @@ class _PaymentsScreenState
       Map<String, dynamic>
           data = {};
 
-      try {
-        final decoded =
-            jsonDecode(
-          response.body,
-        );
+      final decoded =
+          _apiService.decodeResponse(
+        response,
+      );
 
-        if (decoded
-            is Map<String, dynamic>) {
-          data = decoded;
-        }
-      } catch (_) {}
+      if (decoded is Map) {
+        data =
+            Map<String, dynamic>.from(
+          decoded,
+        );
+      }
 
       if (response.statusCode ==
           200) {
@@ -1639,6 +1630,10 @@ class _PaymentsScreenState
         );
       }
     } catch (e) {
+      debugPrint(
+        'Erreur paiement : $e',
+      );
+
       if (!mounted) return;
 
       _showSnack(
@@ -2161,7 +2156,6 @@ class _PaymentsScreenState
                 : const Color(
                     0xFFF5F7FA,
                   ),
-
         appBar:
             AppBar(
           backgroundColor:
@@ -2178,7 +2172,6 @@ class _PaymentsScreenState
             ),
           ),
         ),
-
         body:
             SafeArea(
           child:
@@ -2195,10 +2188,6 @@ class _PaymentsScreenState
               crossAxisAlignment:
                   CrossAxisAlignment.start,
               children: [
-                // ==========================================
-                // COMPTE COURANT
-                // ==========================================
-
                 _buildAccountHeader(
                   context,
                 ),
@@ -2222,10 +2211,6 @@ class _PaymentsScreenState
                       13,
                 ),
 
-                // ==========================================
-                // FACTURES
-                // ==========================================
-
                 _buildCategoryCard(
                   title:
                       'Factures',
@@ -2241,10 +2226,6 @@ class _PaymentsScreenState
                   height:
                       12,
                 ),
-
-                // ==========================================
-                // SERVICES
-                // ==========================================
 
                 _buildCategoryCard(
                   title:
@@ -2262,10 +2243,6 @@ class _PaymentsScreenState
                   height:
                       12,
                 ),
-
-                // ==========================================
-                // RECHARGES
-                // ==========================================
 
                 _buildCategoryCard(
                   title:
@@ -2402,7 +2379,6 @@ class _PaymentsScreenState
               : const Color(
                   0xFFF5F7FA,
                 ),
-
       appBar:
           AppBar(
         backgroundColor:
@@ -2430,7 +2406,6 @@ class _PaymentsScreenState
           ),
         ),
       ),
-
       body:
           SingleChildScrollView(
         padding:
@@ -2449,10 +2424,6 @@ class _PaymentsScreenState
             crossAxisAlignment:
                 CrossAxisAlignment.start,
             children: [
-              // =============================================
-              // HEADER COMPTE
-              // =============================================
-
               _buildAccountHeader(
                 context,
               ),
@@ -2481,10 +2452,6 @@ class _PaymentsScreenState
                 height:
                     12,
               ),
-
-              // =============================================
-              // ORGANISME
-              // =============================================
 
               DropdownButtonFormField<
                   String>(
@@ -2584,21 +2551,11 @@ class _PaymentsScreenState
                     18,
               ),
 
-              // =============================================
-              // AMENDES RADAR
-              // =============================================
-
               if (_isRadar) ...[
                 _buildRadarForm(
                   isDark,
                 ),
-              ]
-
-              // =============================================
-              // FORMULAIRE CLASSIQUE
-              // =============================================
-
-              else ...[
+              ] else ...[
                 TextFormField(
                   controller:
                       _referenceController,
@@ -2935,12 +2892,10 @@ class _PaymentsScreenState
           validator:
               _validateImmatriculation,
         ),
-
         const SizedBox(
           height:
               12,
         ),
-
         SizedBox(
           width:
               double.infinity,
@@ -2997,7 +2952,6 @@ class _PaymentsScreenState
             ),
           ),
         ),
-
         if (_radarSearched) ...[
           const SizedBox(
             height:
@@ -3019,7 +2973,6 @@ class _PaymentsScreenState
           ),
           _buildRadarFineTable(),
         ],
-
         if (_selectedRadarFine !=
             null) ...[
           const SizedBox(
@@ -3254,6 +3207,8 @@ class _PaymentsScreenState
 
     _amountController
         .dispose();
+
+    _apiService.dispose();
 
     super.dispose();
   }

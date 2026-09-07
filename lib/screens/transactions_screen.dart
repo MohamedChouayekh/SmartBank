@@ -1,9 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../models/transaction.dart';
+import '../services/api_service.dart';
 import '../widgets/transaction_item.dart';
 
 class TransactionsScreen extends StatefulWidget {
@@ -21,17 +19,7 @@ class TransactionsScreen extends StatefulWidget {
 
 class _TransactionsScreenState
     extends State<TransactionsScreen> {
-
-  // =========================================================
-  // API
-  // =========================================================
-
-  static const String baseUrl =
-      'http://192.168.1.155:8080';
-
-  // =========================================================
-  // ÉTAT
-  // =========================================================
+  final ApiService _apiService = ApiService();
 
   String _selectedFilter = 'Toutes';
 
@@ -41,10 +29,6 @@ class _TransactionsScreenState
 
   List<BankTransaction> _transactions = [];
 
-  // =========================================================
-  // INIT
-  // =========================================================
-
   @override
   void initState() {
     super.initState();
@@ -52,12 +36,13 @@ class _TransactionsScreenState
     _loadTransactions();
   }
 
-  // =========================================================
-  // CHARGER LES TRANSACTIONS
-  // =========================================================
+  @override
+  void dispose() {
+    _apiService.dispose();
+    super.dispose();
+  }
 
   Future<void> _loadTransactions() async {
-
     if (!mounted) return;
 
     setState(() {
@@ -66,17 +51,13 @@ class _TransactionsScreenState
     });
 
     try {
-
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/api/transactions/user/${widget.userId}',
-        ),
+      final response = await _apiService.get(
+        '/api/transactions/user/${widget.userId}',
       );
 
       if (!mounted) return;
 
       if (response.statusCode != 200) {
-
         setState(() {
           _isLoading = false;
           _errorMessage =
@@ -88,7 +69,7 @@ class _TransactionsScreenState
       }
 
       final dynamic decoded =
-          jsonDecode(response.body);
+          _apiService.decodeResponse(response);
 
       if (decoded is! List) {
         throw Exception(
@@ -100,17 +81,14 @@ class _TransactionsScreenState
           loadedTransactions = [];
 
       for (final item in decoded) {
-
-        if (item is Map<String, dynamic>) {
-
+        if (item is Map) {
           try {
-
             loadedTransactions.add(
-              _bankTransactionFromJson(item),
+              _bankTransactionFromJson(
+                Map<String, dynamic>.from(item),
+              ),
             );
-
           } catch (e) {
-
             debugPrint(
               'Transaction ignorée : $e',
             );
@@ -121,21 +99,14 @@ class _TransactionsScreenState
       if (!mounted) return;
 
       setState(() {
-
-        _transactions =
-            loadedTransactions;
-
+        _transactions = loadedTransactions;
         _isLoading = false;
       });
-
     } catch (e) {
-
       if (!mounted) return;
 
       setState(() {
-
         _isLoading = false;
-
         _errorMessage =
             'Impossible de contacter le serveur.\n'
             'Vérifiez que Spring Boot est démarré.';
@@ -147,13 +118,8 @@ class _TransactionsScreenState
     }
   }
 
-  // =========================================================
-  // JSON -> BankTransaction
-  // =========================================================
-
   BankTransaction _bankTransactionFromJson(
       Map<String, dynamic> json) {
-
     final int id =
         _parseInt(json['id']);
 
@@ -184,21 +150,12 @@ class _TransactionsScreenState
     final DateTime date =
         _parseDate(json['createdAt']);
 
-    // =======================================================
-    // TYPE
-    // =======================================================
-
     final bool isIncome =
         type == 'TRANSFER_IN';
-
-    // =======================================================
-    // TITRE
-    // =======================================================
 
     String title;
 
     switch (type) {
-
       case 'TRANSFER_IN':
         title = 'Virement reçu';
         break;
@@ -223,71 +180,46 @@ class _TransactionsScreenState
             : 'Transaction';
     }
 
-    // =======================================================
-    // DESCRIPTION
-    // =======================================================
-
     String description;
 
     if (type == 'TRANSFER_IN') {
-
       if (relatedAccountNumber.isNotEmpty) {
-
         description =
             'Virement reçu de '
             '$relatedAccountNumber';
-
       } else {
-
         description =
             'Virement bancaire reçu';
       }
-
     } else if (type == 'TRANSFER_OUT') {
-
       if (relatedAccountNumber.isNotEmpty) {
-
         description =
             'Virement vers '
             '$relatedAccountNumber';
-
       } else {
-
         description =
             'Virement bancaire envoyé';
       }
-
     } else if (type == 'PAYMENT') {
-
       if (reference.isNotEmpty) {
-
         description =
             '$label • Référence : $reference';
-
       } else {
-
         description =
             label.isNotEmpty
                 ? label
                 : 'Paiement';
       }
-
     } else {
-
       description =
           label.isNotEmpty
               ? label
               : 'Transaction';
     }
 
-    // =======================================================
-    // CATÉGORIE
-    // =======================================================
-
     String category;
 
     switch (type) {
-
       case 'TRANSFER_IN':
       case 'TRANSFER_OUT':
         category = 'Virement';
@@ -308,29 +240,17 @@ class _TransactionsScreenState
                 : 'Autre';
     }
 
-    // =======================================================
-    // RETOUR
-    // =======================================================
-
     return BankTransaction(
       id: id,
-
       title: title,
-
       description: description,
-
       amount: amount,
-
       currency: 'TND',
-
       date: date,
-
       type: isIncome
           ? TransactionType.income
           : TransactionType.expense,
-
       category: category,
-
       relatedAccountNumber:
           relatedAccountNumber.isNotEmpty
               ? relatedAccountNumber
@@ -338,12 +258,7 @@ class _TransactionsScreenState
     );
   }
 
-  // =========================================================
-  // PARSE INT
-  // =========================================================
-
   int _parseInt(dynamic value) {
-
     if (value is int) {
       return value;
     }
@@ -358,12 +273,7 @@ class _TransactionsScreenState
         0;
   }
 
-  // =========================================================
-  // PARSE DOUBLE
-  // =========================================================
-
   double _parseDouble(dynamic value) {
-
     if (value is double) {
       return value;
     }
@@ -378,12 +288,7 @@ class _TransactionsScreenState
         0.0;
   }
 
-  // =========================================================
-  // PARSE DATE
-  // =========================================================
-
   DateTime _parseDate(dynamic value) {
-
     if (value is DateTime) {
       return value;
     }
@@ -396,15 +301,9 @@ class _TransactionsScreenState
     return parsed ?? DateTime.now();
   }
 
-  // =========================================================
-  // FILTRE
-  // =========================================================
-
   List<BankTransaction>
       get _filteredTransactions {
-
     if (_selectedFilter == 'Entrées') {
-
       return _transactions
           .where(
             (transaction) =>
@@ -415,7 +314,6 @@ class _TransactionsScreenState
     }
 
     if (_selectedFilter == 'Sorties') {
-
       return _transactions
           .where(
             (transaction) =>
@@ -428,19 +326,13 @@ class _TransactionsScreenState
     return _transactions;
   }
 
-  // =========================================================
-  // DÉTAIL TRANSACTION
-  // =========================================================
-
   void _showTransactionDetails(
       BankTransaction transaction) {
-
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
-
         final bool isIncome =
             transaction.type ==
                 TransactionType.income;
@@ -452,14 +344,11 @@ class _TransactionsScreenState
             24,
             30,
           ),
-
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment:
                 CrossAxisAlignment.start,
-
             children: [
-
               Text(
                 'Détail de la transaction',
                 style: Theme.of(context)
@@ -476,12 +365,10 @@ class _TransactionsScreenState
               Center(
                 child: CircleAvatar(
                   radius: 32,
-
                   child: Icon(
                     isIncome
                         ? Icons.arrow_downward
                         : Icons.arrow_upward,
-
                     size: 30,
                   ),
                 ),
@@ -492,10 +379,8 @@ class _TransactionsScreenState
               Center(
                 child: Text(
                   transaction.title,
-
                   textAlign:
                       TextAlign.center,
-
                   style: Theme.of(context)
                       .textTheme
                       .titleLarge
@@ -547,13 +432,11 @@ class _TransactionsScreenState
               if (transaction
                       .relatedAccountNumber !=
                   null)
-
                 _DetailRow(
                   label:
                       isIncome
                           ? 'Compte émetteur'
                           : 'Compte bénéficiaire',
-
                   value:
                       transaction
                           .relatedAccountNumber!,
@@ -571,13 +454,8 @@ class _TransactionsScreenState
     );
   }
 
-  // =========================================================
-  // FORMAT DATE
-  // =========================================================
-
   String _formatDateTime(
       DateTime date) {
-
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year} '
@@ -586,39 +464,27 @@ class _TransactionsScreenState
         '${date.minute.toString().padLeft(2, '0')}';
   }
 
-  // =========================================================
-  // BUILD
-  // =========================================================
-
   @override
   Widget build(BuildContext context) {
-
     final List<BankTransaction>
         transactions =
         _filteredTransactions;
 
     return Scaffold(
-
       appBar: AppBar(
-
         title: const Text(
           'Transactions',
-
           style: TextStyle(
             fontWeight: FontWeight.bold,
           ),
         ),
-
         actions: [
-
           IconButton(
             tooltip: 'Actualiser',
-
             onPressed:
                 _isLoading
                     ? null
                     : _loadTransactions,
-
             icon:
                 const Icon(
               Icons.refresh,
@@ -626,30 +492,20 @@ class _TransactionsScreenState
           ),
         ],
       ),
-
       body: RefreshIndicator(
-
         onRefresh:
             _loadTransactions,
-
         child: SingleChildScrollView(
-
           physics:
               const AlwaysScrollableScrollPhysics(),
-
           padding:
               const EdgeInsets.all(20),
-
           child: Column(
-
             crossAxisAlignment:
                 CrossAxisAlignment.start,
-
             children: [
-
               Text(
                 'Historique des transactions',
-
                 style: Theme.of(context)
                     .textTheme
                     .headlineSmall
@@ -664,7 +520,6 @@ class _TransactionsScreenState
               Text(
                 'Consultez toutes les opérations '
                 'de vos comptes.',
-
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium,
@@ -672,28 +527,17 @@ class _TransactionsScreenState
 
               const SizedBox(height: 24),
 
-              // =================================================
-              // FILTRES
-              // =================================================
-
               SingleChildScrollView(
-
                 scrollDirection:
                     Axis.horizontal,
-
                 child: Row(
-
                   children: [
-
                     _FilterButton(
                       label: 'Toutes',
-
                       selected:
                           _selectedFilter ==
                               'Toutes',
-
                       onPressed: () {
-
                         setState(() {
                           _selectedFilter =
                               'Toutes';
@@ -705,13 +549,10 @@ class _TransactionsScreenState
 
                     _FilterButton(
                       label: 'Entrées',
-
                       selected:
                           _selectedFilter ==
                               'Entrées',
-
                       onPressed: () {
-
                         setState(() {
                           _selectedFilter =
                               'Entrées';
@@ -723,13 +564,10 @@ class _TransactionsScreenState
 
                     _FilterButton(
                       label: 'Sorties',
-
                       selected:
                           _selectedFilter ==
                               'Sorties',
-
                       onPressed: () {
-
                         setState(() {
                           _selectedFilter =
                               'Sorties';
@@ -742,48 +580,29 @@ class _TransactionsScreenState
 
               const SizedBox(height: 24),
 
-              // =================================================
-              // LOADING
-              // =================================================
-
               if (_isLoading)
-
                 const Padding(
                   padding:
                       EdgeInsets.symmetric(
                     vertical: 60,
                   ),
-
                   child: Center(
                     child:
                         CircularProgressIndicator(),
                   ),
                 )
-
-              // =================================================
-              // ERROR
-              // =================================================
-
               else if (_errorMessage != null)
-
                 Center(
-
                   child: Padding(
-
                     padding:
                         const EdgeInsets.symmetric(
                       vertical: 40,
                     ),
-
                     child: Column(
-
                       children: [
-
                         Icon(
                           Icons.cloud_off,
-
                           size: 55,
-
                           color:
                               Colors.grey.shade500,
                         ),
@@ -794,10 +613,8 @@ class _TransactionsScreenState
 
                         Text(
                           _errorMessage!,
-
                           textAlign:
                               TextAlign.center,
-
                           style: TextStyle(
                             color:
                                 Colors.grey.shade700,
@@ -809,15 +626,12 @@ class _TransactionsScreenState
                         ),
 
                         ElevatedButton.icon(
-
                           onPressed:
                               _loadTransactions,
-
                           icon:
                               const Icon(
                             Icons.refresh,
                           ),
-
                           label:
                               const Text(
                             'Réessayer',
@@ -827,31 +641,18 @@ class _TransactionsScreenState
                     ),
                   ),
                 )
-
-              // =================================================
-              // EMPTY
-              // =================================================
-
               else if (transactions.isEmpty)
-
                 Padding(
-
                   padding:
                       const EdgeInsets.symmetric(
                     vertical: 50,
                   ),
-
                   child: Center(
-
                     child: Column(
-
                       children: [
-
                         Icon(
                           Icons.receipt_long_outlined,
-
                           size: 60,
-
                           color:
                               Colors.grey.shade400,
                         ),
@@ -862,7 +663,6 @@ class _TransactionsScreenState
 
                         const Text(
                           'Aucune transaction trouvée.',
-
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight:
@@ -877,10 +677,8 @@ class _TransactionsScreenState
                         Text(
                           'Vos opérations apparaîtront '
                           'ici automatiquement.',
-
                           textAlign:
                               TextAlign.center,
-
                           style: TextStyle(
                             color:
                                 Colors.grey.shade600,
@@ -890,37 +688,24 @@ class _TransactionsScreenState
                     ),
                   ),
                 )
-
-              // =================================================
-              // LISTE
-              // =================================================
-
               else
-
                 ...transactions.map(
                   (transaction) {
-
                     return Padding(
-
                       padding:
                           const EdgeInsets.only(
                         bottom: 8,
                       ),
-
                       child: InkWell(
-
                         borderRadius:
                             BorderRadius.circular(
                           12,
                         ),
-
                         onTap: () {
-
                           _showTransactionDetails(
                             transaction,
                           );
                         },
-
                         child:
                             TransactionItem(
                           transaction:
@@ -938,17 +723,10 @@ class _TransactionsScreenState
   }
 }
 
-// ============================================================
-// FILTRE
-// ============================================================
-
 class _FilterButton
     extends StatelessWidget {
-
   final String label;
-
   final bool selected;
-
   final VoidCallback onPressed;
 
   const _FilterButton({
@@ -960,15 +738,11 @@ class _FilterButton
   @override
   Widget build(
       BuildContext context) {
-
     return FilterChip(
-
       label:
           Text(label),
-
       selected:
           selected,
-
       onSelected: (_) {
         onPressed();
       },
@@ -976,15 +750,9 @@ class _FilterButton
   }
 }
 
-// ============================================================
-// DETAIL ROW
-// ============================================================
-
 class _DetailRow
     extends StatelessWidget {
-
   final String label;
-
   final String value;
 
   const _DetailRow({
@@ -995,25 +763,18 @@ class _DetailRow
   @override
   Widget build(
       BuildContext context) {
-
     return Padding(
-
       padding:
           const EdgeInsets.symmetric(
         vertical: 8,
       ),
-
       child: Row(
-
         crossAxisAlignment:
             CrossAxisAlignment.start,
-
         children: [
-
           Expanded(
             child: Text(
               label,
-
               style:
                   const TextStyle(
                 fontWeight:
@@ -1027,7 +788,6 @@ class _DetailRow
           Expanded(
             child: Text(
               value,
-
               textAlign:
                   TextAlign.right,
             ),

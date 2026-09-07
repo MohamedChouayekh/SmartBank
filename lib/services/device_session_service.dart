@@ -4,8 +4,9 @@ import 'dart:math';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'api_service.dart';
 
 class DeviceSession {
   final int id;
@@ -28,7 +29,10 @@ class DeviceSession {
 
   factory DeviceSession.fromJson(Map<String, dynamic> json) {
     return DeviceSession(
-      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      id: int.tryParse(
+            json['id']?.toString() ?? '',
+          ) ??
+          0,
       deviceIdentifier:
           json['deviceIdentifier']?.toString() ?? '',
       deviceName:
@@ -55,11 +59,21 @@ class DeviceSessionException implements Exception {
 }
 
 class DeviceSessionService {
-  static const String baseUrl =
-    'http://192.168.1.155:8080/api/device-sessions';
+  // =========================================================
+  // API
+  // =========================================================
+
+  final ApiService _apiService = ApiService();
+
+  // =========================================================
+  // CONFIGURATION
+  // =========================================================
+
   static const String _deviceIdentifierKey =
       'smartbank_device_identifier';
 
+  // IMPORTANT :
+  // On conserve le timeout original de 10 secondes.
   static const Duration _requestTimeout =
       Duration(seconds: 10);
 
@@ -481,8 +495,8 @@ class DeviceSessionService {
       );
     }
 
-    final uri =
-        Uri.parse(baseUrl);
+    const endpoint =
+        '/api/device-sessions';
 
     final requestBody = {
       'userId':
@@ -510,7 +524,8 @@ class DeviceSessionService {
     );
 
     debugPrint(
-      '[DEVICE SESSION] URL: $uri',
+      '[DEVICE SESSION] URL: '
+      '${ApiService.baseUrl}$endpoint',
     );
 
     debugPrint(
@@ -544,17 +559,10 @@ class DeviceSessionService {
 
     try {
       final response =
-          await http
+          await _apiService
               .post(
-                uri,
-                headers: {
-                  'Content-Type':
-                      'application/json',
-                  'Accept':
-                      'application/json',
-                },
-                body:
-                    jsonEncode(requestBody),
+                endpoint,
+                body: requestBody,
               )
               .timeout(
                 _requestTimeout,
@@ -578,7 +586,9 @@ class DeviceSessionService {
         if (response.body.trim().isNotEmpty) {
           try {
             final data =
-                jsonDecode(response.body);
+                _apiService.decodeResponse(
+              response,
+            );
 
             if (data is Map &&
                 data['message'] != null) {
@@ -617,7 +627,9 @@ class DeviceSessionService {
       }
 
       final decoded =
-          jsonDecode(response.body);
+          _apiService.decodeResponse(
+        response,
+      );
 
       if (decoded is! Map) {
         throw DeviceSessionException(
@@ -742,12 +754,13 @@ class DeviceSessionService {
   // ENVOYER LE HEARTBEAT
   // =========================================================
 
-    Future<void> _sendHeartbeat() async {
+  Future<void> _sendHeartbeat() async {
     if (_heartbeatInProgress) {
       return;
     }
 
-    final userId = _heartbeatUserId;
+    final userId =
+        _heartbeatUserId;
 
     final deviceIdentifier =
         _heartbeatDeviceIdentifier;
@@ -758,15 +771,17 @@ class DeviceSessionService {
       return;
     }
 
-    _heartbeatInProgress = true;
+    _heartbeatInProgress =
+        true;
 
-    final uri = Uri.parse(
-      '$baseUrl/heartbeat',
-    );
+    const endpoint =
+        '/api/device-sessions/heartbeat';
 
     final requestBody = {
-      'userId': userId,
-      'deviceIdentifier': deviceIdentifier,
+      'userId':
+          userId,
+      'deviceIdentifier':
+          deviceIdentifier,
     };
 
     try {
@@ -774,20 +789,15 @@ class DeviceSessionService {
         '[HEARTBEAT] Envoi...',
       );
 
-      final response = await http
-          .post(
-            uri,
-            headers: {
-              'Content-Type':
-                  'application/json',
-              'Accept':
-                  'application/json',
-            },
-            body: jsonEncode(requestBody),
-          )
-          .timeout(
-            _requestTimeout,
-          );
+      final response =
+          await _apiService
+              .post(
+                endpoint,
+                body: requestBody,
+              )
+              .timeout(
+                _requestTimeout,
+              );
 
       debugPrint(
         '[HEARTBEAT] STATUS: '
@@ -829,7 +839,9 @@ class DeviceSessionService {
         if (response.body.trim().isNotEmpty) {
           try {
             final decoded =
-                jsonDecode(response.body);
+                _apiService.decodeResponse(
+              response,
+            );
 
             if (decoded is Map &&
                 decoded['active'] == false) {
@@ -920,15 +932,12 @@ class DeviceSessionService {
       final currentDeviceIdentifier =
           await _getDeviceIdentifier();
 
-      final uri =
-          Uri.parse(
-        '$baseUrl/user/$userId',
-      ).replace(
-        queryParameters: {
-          'currentDeviceIdentifier':
-              currentDeviceIdentifier,
-        },
-      );
+      final endpoint =
+          '/api/device-sessions/user/$userId';
+
+      final queryString =
+          '?currentDeviceIdentifier='
+          '${Uri.encodeQueryComponent(currentDeviceIdentifier)}';
 
       debugPrint(
         '==================================================',
@@ -939,7 +948,10 @@ class DeviceSessionService {
       );
 
       debugPrint(
-        '[DEVICE SESSION] URL: $uri',
+        '[DEVICE SESSION] URL: '
+        '${ApiService.baseUrl}'
+        '$endpoint'
+        '$queryString',
       );
 
       debugPrint(
@@ -947,14 +959,11 @@ class DeviceSessionService {
         '$currentDeviceIdentifier',
       );
 
+      // UNE SEULE REQUÊTE
       final response =
-          await http
+          await _apiService
               .get(
-                uri,
-                headers: {
-                  'Accept':
-                      'application/json',
-                },
+                '$endpoint$queryString',
               )
               .timeout(
                 _requestTimeout,
@@ -977,12 +986,18 @@ class DeviceSessionService {
 
         try {
           final data =
-              jsonDecode(response.body);
+              _apiService.decodeResponse(
+            response,
+          );
 
           if (data is Map &&
               data['message'] != null) {
             message =
                 data['message'].toString();
+          } else if (data is Map &&
+              data['error'] != null) {
+            message =
+                data['error'].toString();
           }
         } catch (_) {}
 
@@ -999,7 +1014,9 @@ class DeviceSessionService {
       }
 
       final decoded =
-          jsonDecode(response.body);
+          _apiService.decodeResponse(
+        response,
+      );
 
       if (decoded is! List) {
         throw DeviceSessionException(
@@ -1068,10 +1085,8 @@ class DeviceSessionService {
   Future<void> disconnectSession(
     int sessionId,
   ) async {
-    final uri =
-        Uri.parse(
-      '$baseUrl/$sessionId',
-    );
+    final endpoint =
+        '/api/device-sessions/$sessionId';
 
     debugPrint(
       '[DEVICE SESSION] DELETE SESSION '
@@ -1080,13 +1095,9 @@ class DeviceSessionService {
 
     try {
       final response =
-          await http
+          await _apiService
               .delete(
-                uri,
-                headers: {
-                  'Accept':
-                      'application/json',
-                },
+                endpoint,
               )
               .timeout(
                 _requestTimeout,
@@ -1109,12 +1120,18 @@ class DeviceSessionService {
 
         try {
           final data =
-              jsonDecode(response.body);
+              _apiService.decodeResponse(
+            response,
+          );
 
           if (data is Map &&
               data['message'] != null) {
             message =
                 data['message'].toString();
+          } else if (data is Map &&
+              data['error'] != null) {
+            message =
+                data['error'].toString();
           }
         } catch (_) {}
 
@@ -1144,10 +1161,8 @@ class DeviceSessionService {
     int userId,
     int currentSessionId,
   ) async {
-    final uri =
-        Uri.parse(
-      '$baseUrl/disconnect-others',
-    );
+    const endpoint =
+        '/api/device-sessions/disconnect-others';
 
     final requestBody = {
       'userId':
@@ -1161,7 +1176,8 @@ class DeviceSessionService {
     );
 
     debugPrint(
-      '[DEVICE SESSION] URL: $uri',
+      '[DEVICE SESSION] URL: '
+      '${ApiService.baseUrl}$endpoint',
     );
 
     debugPrint(
@@ -1171,17 +1187,10 @@ class DeviceSessionService {
 
     try {
       final response =
-          await http
+          await _apiService
               .post(
-                uri,
-                headers: {
-                  'Content-Type':
-                      'application/json',
-                  'Accept':
-                      'application/json',
-                },
-                body:
-                    jsonEncode(requestBody),
+                endpoint,
+                body: requestBody,
               )
               .timeout(
                 _requestTimeout,
@@ -1204,12 +1213,18 @@ class DeviceSessionService {
 
         try {
           final data =
-              jsonDecode(response.body);
+              _apiService.decodeResponse(
+            response,
+          );
 
           if (data is Map &&
               data['message'] != null) {
             message =
                 data['message'].toString();
+          } else if (data is Map &&
+              data['error'] != null) {
+            message =
+                data['error'].toString();
           }
         } catch (_) {}
 
@@ -1239,10 +1254,8 @@ class DeviceSessionService {
   Future<void> disconnectAllSessions(
     int userId,
   ) async {
-    final uri =
-        Uri.parse(
-      '$baseUrl/disconnect-all',
-    );
+    const endpoint =
+        '/api/device-sessions/disconnect-all';
 
     final requestBody = {
       'userId':
@@ -1254,7 +1267,8 @@ class DeviceSessionService {
     );
 
     debugPrint(
-      '[DEVICE SESSION] URL: $uri',
+      '[DEVICE SESSION] URL: '
+      '${ApiService.baseUrl}$endpoint',
     );
 
     debugPrint(
@@ -1264,17 +1278,10 @@ class DeviceSessionService {
 
     try {
       final response =
-          await http
+          await _apiService
               .post(
-                uri,
-                headers: {
-                  'Content-Type':
-                      'application/json',
-                  'Accept':
-                      'application/json',
-                },
-                body:
-                    jsonEncode(requestBody),
+                endpoint,
+                body: requestBody,
               )
               .timeout(
                 _requestTimeout,
@@ -1297,12 +1304,18 @@ class DeviceSessionService {
 
         try {
           final data =
-              jsonDecode(response.body);
+              _apiService.decodeResponse(
+            response,
+          );
 
           if (data is Map &&
               data['message'] != null) {
             message =
                 data['message'].toString();
+          } else if (data is Map &&
+              data['error'] != null) {
+            message =
+                data['error'].toString();
           }
         } catch (_) {}
 

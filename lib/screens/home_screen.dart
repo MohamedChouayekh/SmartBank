@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../models/transaction.dart';
+import '../services/api_service.dart';
 import '../widgets/smartbank_brand.dart';
 
 import 'payments_screen.dart';
@@ -39,10 +38,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
   // ============================================================
-  // CONFIGURATION
+  // SERVICE API
   // ============================================================
 
-  static const String baseUrl = 'http://192.168.1.155:8080';
+  final ApiService _apiService = ApiService();
+
+  // ============================================================
+  // CONFIGURATION UI
+  // ============================================================
 
   static const Color _blue = Color(0xFF0B5AA6);
   static const Color _darkBlue = Color(0xFF06457E);
@@ -162,15 +165,9 @@ class _HomeScreenState extends State<HomeScreen>
       // 1. COMPTES
       // ========================================================
 
-      final accountsResponse = await http
-          .get(
-            Uri.parse(
-              '$baseUrl/api/accounts/user/${widget.userId}',
-            ),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-          );
+      final accountsResponse = await _apiService.get(
+        '/api/accounts/user/${widget.userId}',
+      );
 
       if (!mounted) return;
 
@@ -180,9 +177,8 @@ class _HomeScreenState extends State<HomeScreen>
         );
       }
 
-      final decodedAccounts = jsonDecode(
-        accountsResponse.body,
-      );
+      final decodedAccounts =
+          _apiService.decodeResponse(accountsResponse);
 
       if (decodedAccounts is! List) {
         throw Exception(
@@ -195,23 +191,26 @@ class _HomeScreenState extends State<HomeScreen>
       Map<String, dynamic>? savingsAccount;
 
       for (final account in decodedAccounts) {
-        if (account is! Map<String, dynamic>) {
+        if (account is! Map) {
           continue;
         }
 
-        final type = (account['type'] ?? '')
+        final Map<String, dynamic> accountMap =
+            Map<String, dynamic>.from(account);
+
+        final type = (accountMap['type'] ?? '')
             .toString()
             .trim()
             .toUpperCase();
 
         if (type == 'CURRENT' &&
             currentAccount == null) {
-          currentAccount = account;
+          currentAccount = accountMap;
         }
 
         if (type == 'SAVINGS' &&
             savingsAccount == null) {
-          savingsAccount = account;
+          savingsAccount = accountMap;
         }
       }
 
@@ -276,8 +275,7 @@ class _HomeScreenState extends State<HomeScreen>
       // 5. SOLDE ÉPARGNE
       // ========================================================
 
-      double savingsBalance =
-          widget.epargneBalance;
+      double savingsBalance = widget.epargneBalance;
 
       if (savingsAccount != null) {
         final dynamic rawSavingsBalance =
@@ -307,15 +305,9 @@ class _HomeScreenState extends State<HomeScreen>
       // 6. TRANSACTIONS
       // ========================================================
 
-      final transactionsResponse = await http
-          .get(
-            Uri.parse(
-              '$baseUrl/api/transactions/account/$_currentAccountId',
-            ),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-          );
+      final transactionsResponse = await _apiService.get(
+        '/api/transactions/account/$_currentAccountId',
+      );
 
       if (!mounted) return;
 
@@ -325,8 +317,9 @@ class _HomeScreenState extends State<HomeScreen>
         );
       }
 
-      final decodedTransactions = jsonDecode(
-        transactionsResponse.body,
+      final decodedTransactions =
+          _apiService.decodeResponse(
+        transactionsResponse,
       );
 
       if (decodedTransactions is! List) {
@@ -335,16 +328,19 @@ class _HomeScreenState extends State<HomeScreen>
         );
       }
 
-      final List<BankTransaction> loadedTransactions =
-          [];
+      final List<BankTransaction> loadedTransactions = [];
 
       for (final item in decodedTransactions) {
-        if (item is! Map<String, dynamic>) {
+        if (item is! Map) {
           continue;
         }
 
-        final transaction =
-            _convertTransaction(item);
+        final Map<String, dynamic> itemMap =
+            Map<String, dynamic>.from(item);
+
+        final transaction = _convertTransaction(
+          itemMap,
+        );
 
         if (transaction != null) {
           loadedTransactions.add(transaction);
@@ -864,7 +860,8 @@ class _HomeScreenState extends State<HomeScreen>
                     BoxShape.circle,
                 color: Colors.white
                     .withValues(
-                  alpha: 0.05,
+                  alpha:
+                      0.05,
                 ),
               ),
             ),
@@ -883,7 +880,8 @@ class _HomeScreenState extends State<HomeScreen>
                     BoxShape.circle,
                 color: Colors.white
                     .withValues(
-                  alpha: 0.04,
+                  alpha:
+                      0.04,
                 ),
               ),
             ),
@@ -1764,6 +1762,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     WidgetsBinding.instance
         .removeObserver(this);
+
+    _apiService.dispose();
 
     super.dispose();
   }

@@ -1,9 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../models/user.dart';
+import '../services/api_service.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({
@@ -34,11 +32,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final TextEditingController confirmPasswordController =
       TextEditingController();
 
+  final ApiService _apiService = ApiService();
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
-
-  static const String baseUrl = 'http://192.168.1.155:8080';
 
   @override
   void dispose() {
@@ -50,6 +48,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     addressController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
+    _apiService.dispose();
     super.dispose();
   }
 
@@ -208,16 +207,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
     for (final type in types) {
       try {
-        final response = await http.post(
-          Uri.parse('$baseUrl/api/accounts'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: jsonEncode({
+        final response = await _apiService.post(
+          '/api/accounts',
+          body: {
             'userId': userId,
             'type': type,
-          }),
+          },
         );
 
         debugPrint(
@@ -273,8 +268,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     });
 
     try {
-      final url = Uri.parse('$baseUrl/api/users');
-
       final Map<String, dynamic> requestBody = {
         'username': usernameController.text.trim(),
         'password': password,
@@ -288,7 +281,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
       debugPrint('==============================');
       debugPrint('CREATE USER REQUEST');
-      debugPrint('URL: $url');
+      debugPrint(
+        'URL: ${ApiService.baseUrl}/api/users',
+      );
       debugPrint('username: ${requestBody['username']}');
       debugPrint('email: ${requestBody['email']}');
       debugPrint('fullName: ${requestBody['fullName']}');
@@ -298,13 +293,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       debugPrint('password length: ${password.length}');
       debugPrint('==============================');
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(requestBody),
+      final response = await _apiService.post(
+        '/api/users',
+        body: requestBody,
       );
 
       if (!mounted) {
@@ -321,8 +312,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
       if (response.statusCode == 200 ||
           response.statusCode == 201) {
+        final decoded = _apiService.decodeResponse(response);
+
+        if (decoded is! Map) {
+          throw Exception(
+            'Format de réponse invalide.',
+          );
+        }
+
         final Map<String, dynamic> data =
-            jsonDecode(response.body);
+            Map<String, dynamic>.from(decoded);
 
         final int newUserId =
             (data['id'] as num).toInt();

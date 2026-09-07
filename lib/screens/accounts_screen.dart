@@ -1,10 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 
 import '../models/account.dart';
+import '../services/api_service.dart';
 
 class AccountsScreen extends StatefulWidget {
   final int userId;
@@ -30,8 +28,15 @@ class AccountsScreen extends StatefulWidget {
 
 class _AccountsScreenState
     extends State<AccountsScreen> {
-  static const String baseUrl =
-      'http://192.168.1.155:8080';
+  // =========================================================
+  // API
+  // =========================================================
+
+  final ApiService _apiService = ApiService();
+
+  // =========================================================
+  // CONFIGURATION
+  // =========================================================
 
   static const Color blue =
       Color(0xFF0B5AA6);
@@ -53,6 +58,10 @@ class _AccountsScreenState
 
   double _courant = 0.0;
   double _epargne = 0.0;
+
+  // =========================================================
+  // INIT
+  // =========================================================
 
   @override
   void initState() {
@@ -104,15 +113,9 @@ class _AccountsScreenState
     });
 
     try {
-      final response = await http
-          .get(
-            Uri.parse(
-              '$baseUrl/api/accounts/user/${widget.userId}',
-            ),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-          );
+      final response = await _apiService.get(
+        '/api/accounts/user/${widget.userId}',
+      );
 
       if (!mounted) return;
 
@@ -123,7 +126,7 @@ class _AccountsScreenState
       }
 
       final decoded =
-          jsonDecode(response.body);
+          _apiService.decodeResponse(response);
 
       if (decoded is! List) {
         throw Exception(
@@ -557,35 +560,28 @@ class _AccountsScreenState
     required double amount,
     required String label,
   }) async {
-    final response = await http.post(
-      Uri.parse(
-        '$baseUrl/api/transactions/transfer',
-      ),
-      headers: {
-        'Content-Type':
-            'application/json',
-      },
-      body: jsonEncode({
+    final response =
+        await _apiService.post(
+      '/api/transactions/transfer',
+      body: {
         'fromAccountNumber':
             fromAccountNumber,
         'toAccountNumber':
             toAccountNumber,
         'amount': amount,
         'label': label,
-      }),
+      },
     );
 
     Map<String, dynamic> data = {};
 
-    try {
-      final decoded =
-          jsonDecode(response.body);
+    final decoded =
+        _apiService.decodeResponse(response);
 
-      if (decoded
-          is Map<String, dynamic>) {
-        data = decoded;
-      }
-    } catch (_) {}
+    if (decoded
+        is Map<String, dynamic>) {
+      data = decoded;
+    }
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -747,7 +743,6 @@ class _AccountsScreenState
                     const SizedBox(
                       height: 16,
                     ),
-
                     Row(
                       children: [
                         Expanded(
@@ -827,11 +822,9 @@ class _AccountsScreenState
                         ),
                       ],
                     ),
-
                     const SizedBox(
                       height: 16,
                     ),
-
                     _buildTransferAccountBox(
                       title:
                           'Compte source',
@@ -850,11 +843,9 @@ class _AccountsScreenState
                       isDark:
                           isDark,
                     ),
-
                     const SizedBox(
                       height: 10,
                     ),
-
                     _buildTransferAccountBox(
                       title:
                           'Compte destination',
@@ -875,11 +866,9 @@ class _AccountsScreenState
                       isDark:
                           isDark,
                     ),
-
                     const SizedBox(
                       height: 16,
                     ),
-
                     TextField(
                       controller:
                           amountController,
@@ -1286,7 +1275,6 @@ class _AccountsScreenState
           isDark
               ? const Color(0xFF0F1723)
               : const Color(0xFFF5F7FA),
-
       appBar:
           AppBar(
         backgroundColor:
@@ -1320,7 +1308,6 @@ class _AccountsScreenState
           ),
         ],
       ),
-
       body:
           _isLoading
               ? const Center(
@@ -1787,5 +1774,15 @@ class _AccountsScreenState
                   ),
                 ),
     );
+  }
+
+  // =========================================================
+  // DISPOSE
+  // =========================================================
+
+  @override
+  void dispose() {
+    _apiService.dispose();
+    super.dispose();
   }
 }

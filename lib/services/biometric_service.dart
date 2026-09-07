@@ -1,6 +1,4 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
+import '../services/api_service.dart';
 
 class BiometricServiceException implements Exception {
   final String message;
@@ -16,8 +14,11 @@ class BiometricServiceException implements Exception {
 }
 
 class BiometricService {
-  static const String baseUrl =
-      'http://192.168.1.155:8080/api/biometric';
+  // =========================================================
+  // API
+  // =========================================================
+
+  final ApiService _apiService = ApiService();
 
   // =========================================================
   // ÉTAT PAR APPAREIL
@@ -27,19 +28,11 @@ class BiometricService {
     String deviceIdentifier,
   ) async {
     try {
-      final uri = Uri.parse(
-        '$baseUrl/device',
-      ).replace(
-        queryParameters: {
-          'deviceIdentifier': deviceIdentifier,
-        },
+      final response =
+          await _apiService.get(
+        '/api/biometric/device'
+        '?deviceIdentifier=${Uri.encodeQueryComponent(deviceIdentifier)}',
       );
-
-      final response = await http
-          .get(uri)
-          .timeout(
-            const Duration(seconds: 10),
-          );
 
       return _handleResponse(response);
     } catch (e) {
@@ -61,15 +54,10 @@ class BiometricService {
     int userId,
   ) async {
     try {
-      final response = await http
-          .get(
-            Uri.parse(
-              '$baseUrl/user/$userId',
-            ),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-          );
+      final response =
+          await _apiService.get(
+        '/api/biometric/user/$userId',
+      );
 
       return _handleResponse(response);
     } catch (e) {
@@ -92,22 +80,14 @@ class BiometricService {
     required String deviceIdentifier,
   }) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(
-              '$baseUrl/enable',
-            ),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode({
-              'userId': userId,
-              'deviceIdentifier': deviceIdentifier,
-            }),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-          );
+      final response =
+          await _apiService.post(
+        '/api/biometric/enable',
+        body: {
+          'userId': userId,
+          'deviceIdentifier': deviceIdentifier,
+        },
+      );
 
       return _handleResponse(response);
     } catch (e) {
@@ -130,22 +110,14 @@ class BiometricService {
     required String deviceIdentifier,
   }) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(
-              '$baseUrl/disable',
-            ),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode({
-              'userId': userId,
-              'deviceIdentifier': deviceIdentifier,
-            }),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-          );
+      final response =
+          await _apiService.post(
+        '/api/biometric/disable',
+        body: {
+          'userId': userId,
+          'deviceIdentifier': deviceIdentifier,
+        },
+      );
 
       return _handleResponse(response);
     } catch (e) {
@@ -164,20 +136,20 @@ class BiometricService {
   // =========================================================
 
   Map<String, dynamic> _handleResponse(
-    http.Response response,
+    dynamic response,
   ) {
     Map<String, dynamic> data = {};
 
-    try {
-      if (response.body.isNotEmpty) {
-        final decoded = jsonDecode(response.body);
+    final decoded =
+        _apiService.decodeResponse(
+      response,
+    );
 
-        if (decoded is Map<String, dynamic>) {
-          data = decoded;
-        }
-      }
-    } catch (_) {
-      // Réponse non JSON.
+    if (decoded is Map) {
+      data =
+          Map<String, dynamic>.from(
+        decoded,
+      );
     }
 
     if (response.statusCode >= 200 &&
@@ -193,5 +165,13 @@ class BiometricService {
       message,
       statusCode: response.statusCode,
     );
+  }
+
+  // =========================================================
+  // DISPOSE
+  // =========================================================
+
+  void dispose() {
+    _apiService.dispose();
   }
 }

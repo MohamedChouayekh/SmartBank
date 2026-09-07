@@ -2,20 +2,30 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-/// Service centralisé pour les appels HTTP vers Spring Boot.
+/// Service centralisé pour tous les appels HTTP vers Spring Boot.
+///
+/// IMPORTANT :
+/// Aucun écran ni autre service ne doit contenir directement
+/// l'adresse IP ou le port du backend.
 class ApiService {
-  /// Pour Flutter Web / Chrome.
+  // ===========================================================
+  // CONFIGURATION CENTRALE
+  // ===========================================================
+
+  /// Adresse du backend pour Flutter Web / Chrome
+  /// lorsque Spring Boot tourne sur le même PC.
   ///
-  /// Si tu testes sur Android Emulator :
-  /// http://10.0.2.2:8080
-  ///
-  /// Si tu testes sur téléphone physique :
-  /// http://IP_DE_TON_PC:8080
-static const String baseUrl = 'http://192.168.1.155:8080';
+  /// Pour Android avec `adb reverse tcp:8080 tcp:8080`,
+  /// cette même configuration peut être utilisée avec
+  /// l'adresse locale adaptée.
+  static const String baseUrl =
+      'http://localhost:8080';
+
   final http.Client _client;
 
-  ApiService({http.Client? client})
-      : _client = client ?? http.Client();
+  ApiService({
+    http.Client? client,
+  }) : _client = client ?? http.Client();
 
   // ===========================================================
   // POST JSON
@@ -25,16 +35,18 @@ static const String baseUrl = 'http://192.168.1.155:8080';
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: body == null ? null : jsonEncode(body),
-    );
-
-    return response;
+    return _client
+        .post(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
   }
 
   // ===========================================================
@@ -44,14 +56,38 @@ static const String baseUrl = 'http://192.168.1.155:8080';
   Future<http.Response> get(
     String endpoint,
   ) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {
-        'Accept': 'application/json',
-      },
-    );
+    return _client
+        .get(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
+  }
 
-    return response;
+  // ===========================================================
+  // PUT JSON
+  // ===========================================================
+
+  Future<http.Response> put(
+    String endpoint, {
+    Map<String, dynamic>? body,
+  }) async {
+    return _client
+        .put(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
   }
 
   // ===========================================================
@@ -61,21 +97,25 @@ static const String baseUrl = 'http://192.168.1.155:8080';
   Future<http.Response> delete(
     String endpoint,
   ) async {
-    final response = await _client.delete(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {
-        'Accept': 'application/json',
-      },
-    );
-
-    return response;
+    return _client
+        .delete(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
   }
 
   // ===========================================================
   // JSON RESPONSE
   // ===========================================================
 
-  dynamic decodeResponse(http.Response response) {
+  dynamic decodeResponse(
+    http.Response response,
+  ) {
     if (response.body.isEmpty) {
       return null;
     }
@@ -88,16 +128,20 @@ static const String baseUrl = 'http://192.168.1.155:8080';
   }
 
   // ===========================================================
-  // ERROR MESSAGE
+  // MESSAGE D'ERREUR
   // ===========================================================
 
-  String getErrorMessage(http.Response response) {
+  String getErrorMessage(
+    http.Response response,
+  ) {
     if (response.body.isEmpty) {
       return 'Erreur du serveur (${response.statusCode}).';
     }
 
     try {
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(
+        response.body,
+      );
 
       if (data is Map<String, dynamic>) {
         if (data['message'] != null) {

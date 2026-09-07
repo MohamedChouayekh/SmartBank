@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../models/user.dart';
 import '../screens/home_screen.dart';
@@ -11,6 +9,7 @@ import '../screens/transfers_screen.dart';
 import '../screens/cards_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/login_screen.dart';
+import '../services/api_service.dart';
 import '../services/device_session_service.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -41,11 +40,14 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation>
     with SingleTickerProviderStateMixin {
   // =========================================================
-  // CONFIGURATION
+  // API
   // =========================================================
 
-  static const String baseUrl =
-      'http://192.168.1.155:8080';
+  final ApiService _apiService = ApiService();
+
+  // =========================================================
+  // CONFIGURATION
+  // =========================================================
 
   static const Duration notificationInterval =
       Duration(seconds: 2);
@@ -298,22 +300,8 @@ class _MainNavigationState extends State<MainNavigation>
   Future<void> _loadLatestTransferNotification({
     bool initializeOnly = false,
   }) async {
-    final uri =
-        Uri.parse(
-      '$baseUrl/api/notifications/user/${widget.user.id}',
-    );
-
-    final response =
-        await http.get(
-      uri,
-      headers: {
-        'Accept':
-            'application/json',
-      },
-    ).timeout(
-      const Duration(
-        seconds: 10,
-      ),
+    final response = await _apiService.get(
+      '/api/notifications/user/${widget.user.id}',
     );
 
     debugPrint(
@@ -327,9 +315,7 @@ class _MainNavigationState extends State<MainNavigation>
     }
 
     final decoded =
-        jsonDecode(
-      response.body,
-    );
+        _apiService.decodeResponse(response);
 
     if (decoded is! List ||
         decoded.isEmpty) {
@@ -515,18 +501,8 @@ class _MainNavigationState extends State<MainNavigation>
   ) async {
     try {
       final response =
-          await http.get(
-        Uri.parse(
-          '$baseUrl/api/notification-preferences/${widget.user.id}',
-        ),
-        headers: {
-          'Accept':
-              'application/json',
-        },
-      ).timeout(
-        const Duration(
-          seconds: 10,
-        ),
+          await _apiService.get(
+        '/api/notification-preferences/${widget.user.id}',
       );
 
       if (response.statusCode !=
@@ -535,9 +511,7 @@ class _MainNavigationState extends State<MainNavigation>
       }
 
       final decoded =
-          jsonDecode(
-        response.body,
-      );
+          _apiService.decodeResponse(response);
 
       if (decoded is! Map) {
         return true;
@@ -2110,6 +2084,8 @@ class _MainNavigationState extends State<MainNavigation>
 
     _notificationAnimationController
         .dispose();
+
+    _apiService.dispose();
 
     super.dispose();
   }
