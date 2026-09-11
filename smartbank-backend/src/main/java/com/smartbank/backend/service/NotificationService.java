@@ -4,6 +4,7 @@ import com.smartbank.backend.entity.Notification;
 import com.smartbank.backend.entity.User;
 import com.smartbank.backend.repository.NotificationRepository;
 import com.smartbank.backend.repository.UserRepository;
+
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -27,31 +28,57 @@ public class NotificationService {
     }
 
     // =========================================================
-    // NOTIFICATION TRANSFERT SIMPLE
+    // NOTIFICATION TRANSFERT SORTANT
     // =========================================================
-
-    public void notifyTransfer(
+    public void notifyTransferOut(
             Long userId,
             String title,
-            String message) {
+            String message,
+            BigDecimal amount) {
 
         createNotification(
                 userId,
-                "TRANSFER",
+                "TRANSFER_OUT",
                 title,
                 message,
                 null,
                 null,
-                null,
+                amount,
                 null,
                 null
         );
     }
 
     // =========================================================
-    // NOTIFICATION TRANSFERT DÉTAILLÉE
+    // NOTIFICATION TRANSFERT ENTRANT
     // =========================================================
+    public void notifyTransferIn(
+            Long userId,
+            String title,
+            String message,
+            String senderName,
+            String senderAccountNumber,
+            BigDecimal amount,
+            String sourceAccountType,
+            String destinationAccountType) {
 
+        createNotification(
+                userId,
+                "TRANSFER_IN",
+                title,
+                message,
+                senderName,
+                senderAccountNumber,
+                amount,
+                sourceAccountType,
+                destinationAccountType
+        );
+    }
+
+    // =========================================================
+    // NOTIFICATION TRANSFERT DÉTAILLÉE
+    // Pour les transferts entre les propres comptes
+    // =========================================================
     public void notifyTransferDetailed(
             Long userId,
             String title,
@@ -78,7 +105,6 @@ public class NotificationService {
     // =========================================================
     // NOTIFICATION PAIEMENT
     // =========================================================
-
     public void notifyPayment(
             Long userId,
             String title,
@@ -98,9 +124,72 @@ public class NotificationService {
     }
 
     // =========================================================
-    // CRÉATION
+    // NOTIFICATION RETRAIT
     // =========================================================
+    public void notifyWithdrawal(
+            Long userId,
+            String title,
+            String message,
+            BigDecimal amount) {
 
+        createNotification(
+                userId,
+                "WITHDRAWAL",
+                title,
+                message,
+                null,
+                null,
+                amount,
+                null,
+                null
+        );
+    }
+
+    // =========================================================
+    // NOTIFICATION SÉCURITÉ
+    // =========================================================
+    public void notifySecurity(
+            Long userId,
+            String title,
+            String message) {
+
+        createNotification(
+                userId,
+                "SECURITY",
+                title,
+                message,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    // =========================================================
+    // NOTIFICATION PROMOTION
+    // =========================================================
+    public void notifyPromotion(
+            Long userId,
+            String title,
+            String message) {
+
+        createNotification(
+                userId,
+                "PROMOTION",
+                title,
+                message,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    // =========================================================
+    // CRÉATION D'UNE NOTIFICATION
+    // =========================================================
     private void createNotification(
             Long userId,
             String type,
@@ -156,9 +245,8 @@ public class NotificationService {
     }
 
     // =========================================================
-    // LISTER
+    // LISTER LES NOTIFICATIONS
     // =========================================================
-
     public List<Notification> getNotifications(
             Long userId) {
 
@@ -169,9 +257,8 @@ public class NotificationService {
     }
 
     // =========================================================
-    // LIRE
+    // MARQUER UNE NOTIFICATION COMME LUE
     // =========================================================
-
     public void markAsRead(
             Long notificationId) {
 
