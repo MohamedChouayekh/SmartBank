@@ -4,7 +4,9 @@ import com.smartbank.backend.entity.Account;
 import com.smartbank.backend.entity.Transaction;
 import com.smartbank.backend.repository.AccountRepository;
 import com.smartbank.backend.repository.TransactionRepository;
+
 import jakarta.transaction.Transactional;
+
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -14,7 +16,9 @@ import java.util.List;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
+
     private final AccountRepository accountRepository;
+
     private final NotificationService notificationService;
 
     public TransactionService(
@@ -35,7 +39,6 @@ public class TransactionService {
     // =========================================================
     // TRANSACTIONS PAR COMPTE
     // =========================================================
-
     public List<Transaction> getTransactionsByAccount(
             Long accountId) {
 
@@ -48,7 +51,6 @@ public class TransactionService {
     // =========================================================
     // TRANSACTIONS PAR UTILISATEUR
     // =========================================================
-
     public List<Transaction> getTransactionsByUser(
             Long userId) {
 
@@ -61,7 +63,6 @@ public class TransactionService {
     // =========================================================
     // VIREMENT
     // =========================================================
-
     @Transactional
     public void makeTransfer(
             String fromAccountNumber,
@@ -194,10 +195,14 @@ public class TransactionService {
         // =====================================================
 
         Long sourceUserId =
-                sourceAccount.getUser().getId();
+                sourceAccount
+                        .getUser()
+                        .getId();
 
         Long destinationUserId =
-                destinationAccount.getUser().getId();
+                destinationAccount
+                        .getUser()
+                        .getId();
 
         boolean sameUser =
                 sourceUserId.equals(
@@ -210,10 +215,10 @@ public class TransactionService {
 
         if (sameUser) {
 
-            // CURRENT -> SAVINGS ✅
-            // SAVINGS -> CURRENT ✅
-            // CURRENT -> CURRENT ❌
-            // SAVINGS -> SAVINGS ❌
+            // CURRENT -> SAVINGS
+            // SAVINGS -> CURRENT
+            // CURRENT -> CURRENT interdit
+            // SAVINGS -> SAVINGS interdit
 
             boolean validInternal =
                     (sourceIsCurrent &&
@@ -223,6 +228,7 @@ public class TransactionService {
                                     destinationIsCurrent);
 
             if (!validInternal) {
+
                 throw new RuntimeException(
                         "Entre vos propres comptes, "
                                 + "le transfert est uniquement autorisé "
@@ -232,8 +238,10 @@ public class TransactionService {
 
         } else {
 
+            // =================================================
             // AUTRE CLIENT
-            // CURRENT -> CURRENT ✅
+            // CURRENT -> CURRENT UNIQUEMENT
+            // =================================================
 
             if (!(sourceIsCurrent &&
                     destinationIsCurrent)) {
@@ -357,7 +365,7 @@ public class TransactionService {
         );
 
         // =====================================================
-        // NUMÉRO MASQUÉ
+        // NUMÉRO MASQUÉ DU COMPTE ÉMETTEUR
         // =====================================================
 
         String maskedSenderAccount =
@@ -393,9 +401,12 @@ public class TransactionService {
             String destinationLabel;
 
             if (destinationIsSavings) {
+
                 destinationLabel =
                         "votre compte épargne";
+
             } else {
+
                 destinationLabel =
                         "votre compte courant";
             }
@@ -415,30 +426,35 @@ public class TransactionService {
                             sourceType,
                             destinationType
                     );
-
         }
 
         // =====================================================
         // CAS 2 : AUTRE UTILISATEUR
         // =====================================================
-
         else {
 
+            // =================================================
             // NOTIFICATION ÉMETTEUR
+            // =================================================
+
             notificationService
-                    .notifyTransfer(
+                    .notifyTransferOut(
                             sourceUserId,
                             "Virement envoyé",
                             "Vous avez envoyé "
                                     + amount
                                     + " TND vers "
                                     + destinationAccount
-                                    .getAccountNumber()
+                                    .getAccountNumber(),
+                            amount
                     );
 
+            // =================================================
             // NOTIFICATION DESTINATAIRE
+            // =================================================
+
             notificationService
-                    .notifyTransferDetailed(
+                    .notifyTransferIn(
                             destinationUserId,
                             "Virement reçu",
                             "Vous avez reçu un virement de "
@@ -456,7 +472,6 @@ public class TransactionService {
     // =========================================================
     // MASQUER LE NUMÉRO DU COMPTE
     // =========================================================
-
     private String maskAccountNumber(
             String accountNumber) {
 
@@ -470,6 +485,7 @@ public class TransactionService {
                 accountNumber.trim();
 
         if (clean.length() <= 4) {
+
             return clean;
         }
 
@@ -482,7 +498,6 @@ public class TransactionService {
     // =========================================================
     // PAIEMENT
     // =========================================================
-
     @Transactional
     public void makePayment(
             String accountNumber,
@@ -532,12 +547,16 @@ public class TransactionService {
                         .subtract(amount)
         );
 
-        accountRepository.save(account);
+        accountRepository.save(
+                account
+        );
 
         Transaction transaction =
                 new Transaction();
 
-        transaction.setAccount(account);
+        transaction.setAccount(
+                account
+        );
 
         transaction.setType(
                 "PAYMENT"
@@ -570,5 +589,151 @@ public class TransactionService {
                         + category
                         + ")."
         );
+    }
+
+    // =========================================================
+    // RETRAIT D'ESPÈCES
+    // =========================================================
+    @Transactional
+    public BigDecimal makeWithdrawal(
+            String accountNumber,
+            BigDecimal amount) {
+
+        // =====================================================
+        // VALIDATION DU MONTANT
+        // =====================================================
+
+        if (amount == null ||
+                amount.compareTo(
+                        BigDecimal.ZERO) <= 0) {
+
+            throw new RuntimeException(
+                    "Le montant du retrait doit être supérieur à 0."
+            );
+        }
+
+        // =====================================================
+        // VALIDATION DU COMPTE
+        // =====================================================
+
+        if (accountNumber == null ||
+                accountNumber.trim().isEmpty()) {
+
+            throw new RuntimeException(
+                    "Le compte est obligatoire."
+            );
+        }
+
+        accountNumber =
+                accountNumber.trim();
+
+        // =====================================================
+        // RECHERCHE DU COMPTE
+        // =====================================================
+
+        Account account =
+                accountRepository
+                        .findByAccountNumber(
+                                accountNumber
+                        )
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Compte introuvable."
+                                )
+                        );
+
+        // =====================================================
+        // LE RETRAIT SE FAIT SUR LE COMPTE COURANT
+        // =====================================================
+
+        String accountType =
+                account.getType() == null
+                        ? ""
+                        : account.getType()
+                        .trim()
+                        .toUpperCase();
+
+        if (!"CURRENT".equals(accountType)) {
+
+            throw new RuntimeException(
+                    "Les retraits d'espèces sont uniquement "
+                            + "autorisés depuis le compte courant."
+            );
+        }
+
+        // =====================================================
+        // VÉRIFICATION DU SOLDE
+        // =====================================================
+
+        if (account.getBalance()
+                .compareTo(amount) < 0) {
+
+            throw new RuntimeException(
+                    "Solde insuffisant pour effectuer le retrait."
+            );
+        }
+
+        // =====================================================
+        // DÉBIT DU COMPTE
+        // =====================================================
+
+        account.setBalance(
+                account.getBalance()
+                        .subtract(amount)
+        );
+
+        accountRepository.save(
+                account
+        );
+
+        // =====================================================
+        // CRÉATION DE LA TRANSACTION
+        // =====================================================
+
+        Transaction transaction =
+                new Transaction();
+
+        transaction.setAccount(
+                account
+        );
+
+        transaction.setType(
+                "WITHDRAWAL"
+        );
+
+        transaction.setAmount(
+                amount
+        );
+
+        transaction.setLabel(
+                "Retrait d'espèces"
+        );
+
+        transaction.setReference(
+                "ATM"
+        );
+
+        transactionRepository.save(
+                transaction
+        );
+
+        // =====================================================
+        // NOTIFICATION
+        // =====================================================
+
+        notificationService.notifyWithdrawal(
+                account.getUser().getId(),
+                "Retrait d'espèces",
+                "Vous avez effectué un retrait de "
+                        + amount
+                        + " TND depuis votre compte courant.",
+                amount
+        );
+
+        // =====================================================
+        // RETOUR DU NOUVEAU SOLDE
+        // =====================================================
+
+        return account.getBalance();
     }
 }
