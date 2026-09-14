@@ -16,7 +16,6 @@ public class Notification {
     // =========================================================
     // UTILISATEUR QUI REÇOIT LA NOTIFICATION
     // =========================================================
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -24,42 +23,36 @@ public class Notification {
     // =========================================================
     // TYPE
     // =========================================================
-
     @Column(nullable = false, length = 30)
     private String type;
 
     // =========================================================
     // TITRE
     // =========================================================
-
     @Column(nullable = false, length = 150)
     private String title;
 
     // =========================================================
     // MESSAGE
     // =========================================================
-
     @Column(length = 255)
     private String message;
 
     // =========================================================
     // LU / NON LU
     // =========================================================
-
     @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
     // =========================================================
     // DATE
     // =========================================================
-
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     // =========================================================
     // INFORMATIONS TRANSFERT
     // =========================================================
-
     @Column(name = "sender_name", length = 120)
     private String senderName;
 
@@ -78,16 +71,15 @@ public class Notification {
     // =========================================================
     // CONSTRUCTEUR
     // =========================================================
-
     public Notification() {
     }
 
     // =========================================================
     // DATE AUTOMATIQUE
     // =========================================================
-
     @PrePersist
     protected void onCreate() {
+
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
@@ -167,6 +159,7 @@ public class Notification {
 
     public void setSenderAccountNumber(
             String senderAccountNumber) {
+
         this.senderAccountNumber =
                 senderAccountNumber;
     }
@@ -185,6 +178,7 @@ public class Notification {
 
     public void setSourceAccountType(
             String sourceAccountType) {
+
         this.sourceAccountType =
                 sourceAccountType;
     }
@@ -195,6 +189,7 @@ public class Notification {
 
     public void setDestinationAccountType(
             String destinationAccountType) {
+
         this.destinationAccountType =
                 destinationAccountType;
     }

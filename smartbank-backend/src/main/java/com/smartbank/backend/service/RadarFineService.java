@@ -17,11 +17,22 @@ public class RadarFineService {
     }
 
     public List<RadarFine> findUnpaidByImmatriculation(String immatriculation) {
-        return radarFineRepository.findByImmatriculationAndPaidFalse(immatriculation);
+
+        String normalizedImmatriculation =
+                immatriculation
+                        .trim()
+                        .toUpperCase()
+                        .replaceAll("\\s+", "");
+
+        return radarFineRepository.findUnpaidByNormalizedImmatriculation(
+                normalizedImmatriculation
+        );
     }
 
     public boolean payFine(String reference) {
-        Optional<RadarFine> fineOptional = radarFineRepository.findByReference(reference);
+
+        Optional<RadarFine> fineOptional =
+                radarFineRepository.findByReference(reference);
 
         if (fineOptional.isEmpty()) {
             return false;
