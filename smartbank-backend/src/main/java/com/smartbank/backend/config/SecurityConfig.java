@@ -22,15 +22,35 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
+                // =====================================================
+                // CSRF
+                // =====================================================
                 .csrf(csrf -> csrf.disable())
 
+                // =====================================================
+                // CORS
+                // =====================================================
                 .cors(cors -> cors.configurationSource(
                         corsConfigurationSource()
                 ))
 
+                // =====================================================
+                // AUTORISATION
+                // =====================================================
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/**").permitAll()
+
+                        // Requêtes preflight envoyées par les navigateurs
+                        .requestMatchers(
+                                HttpMethod.OPTIONS,
+                                "/**"
+                        ).permitAll()
+
+                        // Toutes les API SmartBank
+                        .requestMatchers(
+                                "/api/**"
+                        ).permitAll()
+
+                        // Autres endpoints
                         .anyRequest().permitAll()
                 );
 
@@ -43,40 +63,75 @@ public class SecurityConfig {
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
-        // Autorise les origines de l'application.
-        // allowedOriginPatterns accepte "*" contrairement
-        // à allowedOrigins("*") lorsque la configuration
-        // est utilisée avec des credentials.
+        // =====================================================
+        // ORIGINES AUTORISÉES
+        // =====================================================
+        //
+        // Flutter Web s'exécute actuellement depuis une adresse
+        // du type :
+        //
+        // http://localhost:65101
+        //
+        // Le port peut changer, donc on autorise les origines
+        // localhost quel que soit leur port.
+        //
+        // On autorise également les autres origines nécessaires
+        // au fonctionnement de l'application.
+        //
         configuration.setAllowedOriginPatterns(
-                List.of("*")
-        );
-
-        configuration.setAllowedMethods(
                 List.of(
-                        "GET",
-                        "POST",
-                        "PUT",
-                        "DELETE",
-                        "PATCH",
-                        "OPTIONS"
+                        "http://localhost:*",
+                        "http://127.0.0.1:*",
+                        "https://localhost:*",
+                        "https://127.0.0.1:*"
                 )
         );
 
+        // =====================================================
+        // MÉTHODES HTTP AUTORISÉES
+        // =====================================================
+        configuration.setAllowedMethods(
+                List.of(
+                        HttpMethod.GET.name(),
+                        HttpMethod.POST.name(),
+                        HttpMethod.PUT.name(),
+                        HttpMethod.DELETE.name(),
+                        HttpMethod.PATCH.name(),
+                        HttpMethod.OPTIONS.name()
+                )
+        );
+
+        // =====================================================
+        // HEADERS AUTORISÉS
+        // =====================================================
         configuration.setAllowedHeaders(
                 List.of("*")
         );
 
+        // =====================================================
+        // HEADERS EXPOSÉS AU CLIENT
+        // =====================================================
         configuration.setExposedHeaders(
                 List.of("*")
         );
 
-        // Notre application Flutter n'utilise pas
-        // de cookies/session HTTP pour l'authentification.
-        // On désactive donc les credentials CORS.
+        // =====================================================
+        // CREDENTIALS
+        // =====================================================
+        //
+        // SmartBank n'utilise pas de cookies HTTP pour
+        // l'authentification.
+        //
         configuration.setAllowCredentials(false);
 
+        // =====================================================
+        // CACHE DES REQUÊTES PREFLIGHT
+        // =====================================================
         configuration.setMaxAge(3600L);
 
+        // =====================================================
+        // APPLICATION DE LA CONFIGURATION À TOUS LES ENDPOINTS
+        // =====================================================
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
