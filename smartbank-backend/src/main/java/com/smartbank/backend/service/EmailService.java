@@ -16,13 +16,8 @@ public class EmailService {
     @Value("${RESEND_API_KEY:}")
     private String resendApiKey;
 
-    private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
-
-    public EmailService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newHttpClient();
-    }
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     public void sendOtpEmail(String email, String otp) {
 
