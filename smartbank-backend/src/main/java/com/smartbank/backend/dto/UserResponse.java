@@ -13,6 +13,7 @@ public class UserResponse {
     private String phoneNumber;
     private String address;
     private boolean enabled;
+    private String role;
     private LocalDateTime createdAt;
 
     public UserResponse() {
@@ -26,6 +27,7 @@ public class UserResponse {
         this.phoneNumber = user.getPhoneNumber();
         this.address = user.getAddress();
         this.enabled = user.isEnabled();
+        this.role = user.getRole();
         this.createdAt = user.getCreatedAt();
     }
 
@@ -83,6 +85,14 @@ public class UserResponse {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public LocalDateTime getCreatedAt() {
