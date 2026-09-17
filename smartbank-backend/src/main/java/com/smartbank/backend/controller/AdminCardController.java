@@ -18,11 +18,12 @@ public class AdminCardController {
     public AdminCardController(
             AdminCardService adminCardService) {
 
-        this.adminCardService = adminCardService;
+        this.adminCardService =
+                adminCardService;
     }
 
     // =========================================================
-    // RÉCUPÉRER TOUS LES UTILISATEURS
+    // UTILISATEURS
     // =========================================================
 
     @GetMapping("/users")
@@ -35,31 +36,33 @@ public class AdminCardController {
 
             List<Map<String, Object>> response =
                     users.stream()
-                            .map(user -> Map.<String, Object>of(
-                                    "id",
-                                    user.getId(),
+                            .map(user ->
+                                    Map.<String, Object>of(
+                                            "id",
+                                            user.getId(),
 
-                                    "username",
-                                    user.getUsername(),
+                                            "username",
+                                            user.getUsername(),
 
-                                    "email",
-                                    user.getEmail(),
+                                            "email",
+                                            user.getEmail(),
 
-                                    "fullName",
-                                    user.getFullName(),
+                                            "fullName",
+                                            user.getFullName(),
 
-                                    "phoneNumber",
-                                    user.getPhoneNumber(),
+                                            "phoneNumber",
+                                            user.getPhoneNumber(),
 
-                                    "address",
-                                    user.getAddress(),
+                                            "address",
+                                            user.getAddress(),
 
-                                    "enabled",
-                                    user.isEnabled(),
+                                            "enabled",
+                                            user.isEnabled(),
 
-                                    "createdAt",
-                                    user.getCreatedAt()
-                            ))
+                                            "createdAt",
+                                            user.getCreatedAt()
+                                    )
+                            )
                             .toList();
 
             return ResponseEntity.ok(response);
@@ -68,15 +71,17 @@ public class AdminCardController {
 
             return ResponseEntity
                     .badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
     // =========================================================
-    // RÉCUPÉRER TOUTES LES CARTES
+    // TOUTES LES CARTES
     // =========================================================
 
     @GetMapping
@@ -89,41 +94,43 @@ public class AdminCardController {
 
             List<Map<String, Object>> response =
                     cards.stream()
-                            .map(card -> Map.<String, Object>of(
-                                    "id",
-                                    card.getId(),
+                            .map(card ->
+                                    Map.<String, Object>of(
+                                            "id",
+                                            card.getId(),
 
-                                    "cardType",
-                                    card.getCardType(),
+                                            "cardType",
+                                            card.getCardType(),
 
-                                    "lastFourDigits",
-                                    card.getLastFourDigits(),
+                                            "lastFourDigits",
+                                            card.getLastFourDigits(),
 
-                                    "expiryDate",
-                                    card.getExpiryDate(),
+                                            "expiryDate",
+                                            card.getExpiryDate(),
 
-                                    "status",
-                                    card.getStatus(),
+                                            "status",
+                                            card.getStatus(),
 
-                                    "accountNumber",
-                                    card.getAccount()
-                                            .getAccountNumber(),
+                                            "accountNumber",
+                                            card.getAccount()
+                                                    .getAccountNumber(),
 
-                                    "userId",
-                                    card.getAccount()
-                                            .getUser()
-                                            .getId(),
+                                            "userId",
+                                            card.getAccount()
+                                                    .getUser()
+                                                    .getId(),
 
-                                    "username",
-                                    card.getAccount()
-                                            .getUser()
-                                            .getUsername(),
+                                            "username",
+                                            card.getAccount()
+                                                    .getUser()
+                                                    .getUsername(),
 
-                                    "fullName",
-                                    card.getAccount()
-                                            .getUser()
-                                            .getFullName()
-                            ))
+                                            "fullName",
+                                            card.getAccount()
+                                                    .getUser()
+                                                    .getFullName()
+                                    )
+                            )
                             .toList();
 
             return ResponseEntity.ok(response);
@@ -132,15 +139,17 @@ public class AdminCardController {
 
             return ResponseEntity
                     .badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
     // =========================================================
-    // ATTRIBUER UNE CARTE À UN UTILISATEUR
+    // ATTRIBUER UNE CARTE
     // =========================================================
 
     @PostMapping("/assign")
@@ -149,49 +158,35 @@ public class AdminCardController {
 
         try {
 
-            // -------------------------------------------------
-            // USER ID
-            // -------------------------------------------------
-
             if (request.get("userId") == null) {
-
                 throw new RuntimeException(
                         "Utilisateur obligatoire."
                 );
             }
 
-            Long userId = Long.valueOf(
-                    request.get("userId").toString()
-            );
-
-            // -------------------------------------------------
-            // TYPE DE CARTE
-            // -------------------------------------------------
+            Long userId =
+                    Long.valueOf(
+                            request
+                                    .get("userId")
+                                    .toString()
+                    );
 
             if (request.get("cardType") == null) {
-
                 throw new RuntimeException(
                         "Le type de carte est obligatoire."
                 );
             }
 
             String cardType =
-                    request.get("cardType")
+                    request
+                            .get("cardType")
                             .toString();
-
-            // -------------------------------------------------
-            // ATTRIBUTION
-            // -------------------------------------------------
 
             Card card =
                     adminCardService.assignCard(
                             userId,
                             cardType
                     );
-
-            // -------------------------------------------------
-            // RÉPONSE
-            // -------------------------------------------------
 
             return ResponseEntity.ok(
                     Map.of(
@@ -238,10 +233,94 @@ public class AdminCardController {
 
             return ResponseEntity
                     .badRequest()
-                    .body(Map.of(
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
+        }
+    }
+
+    // =========================================================
+    // BLOQUER UNE CARTE
+    // =========================================================
+
+    @PostMapping("/{cardId}/block")
+    public ResponseEntity<?> blockCard(
+            @PathVariable Long cardId) {
+
+        try {
+
+            Card card =
+                    adminCardService.blockCard(
+                            cardId
+                    );
+
+            return ResponseEntity.ok(
+                    Map.of(
                             "message",
-                            e.getMessage()
-                    ));
+                            "Carte bloquée avec succès.",
+
+                            "id",
+                            card.getId(),
+
+                            "status",
+                            card.getStatus()
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
+        }
+    }
+
+    // =========================================================
+    // DÉBLOQUER UNE CARTE
+    // =========================================================
+
+    @PostMapping("/{cardId}/unblock")
+    public ResponseEntity<?> unblockCard(
+            @PathVariable Long cardId) {
+
+        try {
+
+            Card card =
+                    adminCardService.unblockCard(
+                            cardId
+                    );
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Carte débloquée avec succès.",
+
+                            "id",
+                            card.getId(),
+
+                            "status",
+                            card.getStatus()
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 }

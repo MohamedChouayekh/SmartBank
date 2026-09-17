@@ -27,35 +27,29 @@ public class AdminCardService {
     }
 
     // =========================================================
-    // RÉCUPÉRER TOUS LES UTILISATEURS
+    // UTILISATEURS
     // =========================================================
 
     public List<User> getAllUsers() {
-
         return userRepository.findAll();
     }
 
     // =========================================================
-    // RÉCUPÉRER TOUTES LES CARTES
+    // CARTES
     // =========================================================
 
     public List<Card> getAllCards() {
-
         return cardRepository.findAll();
     }
 
     // =========================================================
-    // ATTRIBUER UNE NOUVELLE CARTE À UN UTILISATEUR
+    // ATTRIBUER UNE CARTE
     // =========================================================
 
     @Transactional
     public Card assignCard(
             Long userId,
             String cardType) {
-
-        // -----------------------------------------------------
-        // VÉRIFIER L'UTILISATEUR
-        // -----------------------------------------------------
 
         if (userId == null) {
             throw new RuntimeException(
@@ -71,19 +65,11 @@ public class AdminCardService {
                         )
                 );
 
-        // -----------------------------------------------------
-        // VÉRIFIER QUE L'UTILISATEUR EST ACTIF
-        // -----------------------------------------------------
-
         if (!user.isEnabled()) {
             throw new RuntimeException(
                     "Cet utilisateur est désactivé."
             );
         }
-
-        // -----------------------------------------------------
-        // VÉRIFIER LE TYPE DE CARTE
-        // -----------------------------------------------------
 
         if (cardType == null ||
                 cardType.trim().isEmpty()) {
@@ -104,13 +90,95 @@ public class AdminCardService {
             );
         }
 
-        // -----------------------------------------------------
-        // UTILISER LA LOGIQUE EXISTANTE
-        // -----------------------------------------------------
-
         return cardService.assignCard(
                 userId,
                 normalizedCardType
         );
+    }
+
+    // =========================================================
+    // BLOQUER UNE CARTE DEPUIS L'ADMIN
+    // =========================================================
+
+    @Transactional
+    public Card blockCard(
+            Long cardId) {
+
+        if (cardId == null) {
+            throw new RuntimeException(
+                    "Carte obligatoire."
+            );
+        }
+
+        Card card = cardRepository
+                .findById(cardId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Carte introuvable."
+                        )
+                );
+
+        if ("EXPIRED".equalsIgnoreCase(
+                card.getStatus())) {
+
+            throw new RuntimeException(
+                    "Cette carte est expirée."
+            );
+        }
+
+        if ("BLOCKED".equalsIgnoreCase(
+                card.getStatus())) {
+
+            throw new RuntimeException(
+                    "Cette carte est déjà bloquée."
+            );
+        }
+
+        card.setStatus("BLOCKED");
+
+        return cardRepository.save(card);
+    }
+
+    // =========================================================
+    // DÉBLOQUER UNE CARTE DEPUIS L'ADMIN
+    // =========================================================
+
+    @Transactional
+    public Card unblockCard(
+            Long cardId) {
+
+        if (cardId == null) {
+            throw new RuntimeException(
+                    "Carte obligatoire."
+            );
+        }
+
+        Card card = cardRepository
+                .findById(cardId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Carte introuvable."
+                        )
+                );
+
+        if ("EXPIRED".equalsIgnoreCase(
+                card.getStatus())) {
+
+            throw new RuntimeException(
+                    "Cette carte est expirée et ne peut pas être débloquée."
+            );
+        }
+
+        if ("ACTIVE".equalsIgnoreCase(
+                card.getStatus())) {
+
+            throw new RuntimeException(
+                    "Cette carte est déjà active."
+            );
+        }
+
+        card.setStatus("ACTIVE");
+
+        return cardRepository.save(card);
     }
 }
