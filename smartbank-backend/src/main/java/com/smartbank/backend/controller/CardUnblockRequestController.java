@@ -1,5 +1,6 @@
 package com.smartbank.backend.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartbank.backend.entity.CardUnblockRequest;
 import com.smartbank.backend.service.CardUnblockRequestService;
 import org.springframework.http.ResponseEntity;
@@ -12,11 +13,14 @@ import java.util.Map;
 public class CardUnblockRequestController {
 
     private final CardUnblockRequestService requestService;
+    private final ObjectMapper objectMapper;
 
     public CardUnblockRequestController(
-            CardUnblockRequestService requestService) {
+            CardUnblockRequestService requestService,
+            ObjectMapper objectMapper) {
 
         this.requestService = requestService;
+        this.objectMapper = objectMapper;
     }
 
     // =========================================================
@@ -26,9 +30,23 @@ public class CardUnblockRequestController {
     @PostMapping("/api/cards/{cardId}/unblock-request")
     public ResponseEntity<?> createRequest(
             @PathVariable Long cardId,
-            @RequestBody Map<String, Object> request) {
+            @RequestBody String rawBody) {
 
         try {
+
+            System.out.println(
+                    "[UNBLOCK REQUEST] cardId="
+                            + cardId
+                            + " rawBody="
+                            + rawBody
+            );
+
+            Map<String, Object> request =
+                    objectMapper.readValue(
+                            rawBody,
+                            Map.class
+                    );
+
             if (request.get("userId") == null) {
                 throw new RuntimeException(
                         "Utilisateur obligatoire."
@@ -61,12 +79,14 @@ public class CardUnblockRequestController {
             e.printStackTrace();
 
             return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage() != null
-                                    ? e.getMessage()
-                                    : e.getClass().getName()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage() != null
+                                            ? e.getMessage()
+                                            : e.getClass().getName()
+                            )
+                    );
         }
     }
 
@@ -74,7 +94,9 @@ public class CardUnblockRequestController {
     // CLIENT : VOIR SES DEMANDES
     // =========================================================
 
-    @GetMapping("/api/cards/unblock-requests/user/{userId}")
+    @GetMapping(
+            "/api/cards/unblock-requests/user/{userId}"
+    )
     public ResponseEntity<?> getUserRequests(
             @PathVariable Long userId) {
 
@@ -94,10 +116,12 @@ public class CardUnblockRequestController {
         } catch (RuntimeException e) {
 
             return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
@@ -127,10 +151,12 @@ public class CardUnblockRequestController {
         } catch (RuntimeException e) {
 
             return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
@@ -138,7 +164,9 @@ public class CardUnblockRequestController {
     // ADMIN : VOIR TOUTES LES DEMANDES
     // =========================================================
 
-    @GetMapping("/api/admin/card-unblock-requests")
+    @GetMapping(
+            "/api/admin/card-unblock-requests"
+    )
     public ResponseEntity<?> getAllRequests() {
 
         try {
@@ -155,10 +183,12 @@ public class CardUnblockRequestController {
         } catch (RuntimeException e) {
 
             return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
@@ -211,10 +241,12 @@ public class CardUnblockRequestController {
         } catch (RuntimeException e) {
 
             return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
@@ -267,10 +299,12 @@ public class CardUnblockRequestController {
         } catch (RuntimeException e) {
 
             return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "message",
-                            e.getMessage()
-                    ));
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
@@ -365,6 +399,7 @@ public class CardUnblockRequestController {
                     "processedByUsername",
                     request.getProcessedBy().getUsername()
             );
+
         } else {
 
             response.put(
