@@ -1,11 +1,11 @@
 package com.smartbank.backend.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.smartbank.backend.entity.CardUnblockRequest;
 import com.smartbank.backend.service.CardUnblockRequestService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,51 +21,98 @@ public class CardUnblockRequestController {
     }
 
     // =========================================================
+    // DTO : DEMANDE CLIENT
+    // =========================================================
+
+    public static class UnblockRequestBody {
+
+        private Long userId;
+        private String message;
+
+        public UnblockRequestBody() {
+        }
+
+        public Long getUserId() {
+            return userId;
+        }
+
+        public void setUserId(Long userId) {
+            this.userId = userId;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+    }
+
+    // =========================================================
+    // DTO : DEMANDE ADMIN
+    // =========================================================
+
+    public static class AdminRequestBody {
+
+        private Long adminId;
+        private String adminResponse;
+
+        public AdminRequestBody() {
+        }
+
+        public Long getAdminId() {
+            return adminId;
+        }
+
+        public void setAdminId(Long adminId) {
+            this.adminId = adminId;
+        }
+
+        public String getAdminResponse() {
+            return adminResponse;
+        }
+
+        public void setAdminResponse(String adminResponse) {
+            this.adminResponse = adminResponse;
+        }
+    }
+
+    // =========================================================
     // CLIENT : CRÉER UNE DEMANDE DE DÉBLOCAGE
     // =========================================================
 
     @PostMapping("/api/cards/{cardId}/unblock-request")
     public ResponseEntity<?> createRequest(
             @PathVariable Long cardId,
-            @RequestBody JsonNode request) {
+            @RequestBody UnblockRequestBody body) {
 
         try {
 
-            System.out.println(
-                    "[UNBLOCK REQUEST] cardId="
-                            + cardId
-                            + " body="
-                            + request
-            );
+            if (body == null) {
+                throw new RuntimeException(
+                        "Corps de la requête obligatoire."
+                );
+            }
 
-            if (!request.hasNonNull("userId")) {
+            if (body.getUserId() == null) {
                 throw new RuntimeException(
                         "Utilisateur obligatoire."
                 );
             }
 
-            Long userId =
-                    request.get("userId").asLong();
-
-            String message = null;
-
-            if (request.hasNonNull("message")) {
-                message =
-                        request.get("message").asText();
-            }
-
             CardUnblockRequest created =
                     requestService.createRequest(
-                            userId,
+                            body.getUserId(),
                             cardId,
-                            message
+                            body.getMessage()
                     );
 
             return ResponseEntity.ok(
                     toResponse(created)
             );
 
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
 
             e.printStackTrace();
 
@@ -75,56 +122,38 @@ public class CardUnblockRequestController {
                                     "message",
                                     e.getMessage() != null
                                             ? e.getMessage()
-                                            : e.getClass().getName()
+                                            : "Erreur lors de la création de la demande."
+                            )
+                    );
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return ResponseEntity.internalServerError()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage() != null
+                                            ? e.getMessage()
+                                            : "Erreur interne du serveur."
                             )
                     );
         }
     }
 
     // =========================================================
-    // DIAGNOSTIC : TESTER LA RÉCEPTION DU JSON
-    // =========================================================
-
-    @PostMapping("/api/cards/{cardId}/unblock-request-test")
-    public ResponseEntity<?> testUnblockRequest(
-            @PathVariable Long cardId,
-            @RequestBody JsonNode request) {
-
-        System.out.println(
-                "[UNBLOCK TEST] cardId="
-                        + cardId
-                        + " body="
-                        + request
-        );
-
-        return ResponseEntity.ok(
-                Map.of(
-                        "message",
-                        "JSON reçu correctement.",
-                        "cardId",
-                        cardId,
-                        "body",
-                        request.toString()
-                )
-        );
-    }
-
-    // =========================================================
     // CLIENT : VOIR SES DEMANDES
     // =========================================================
 
-    @GetMapping(
-            "/api/cards/unblock-requests/user/{userId}"
-    )
+    @GetMapping("/api/cards/unblock-requests/user/{userId}")
     public ResponseEntity<?> getUserRequests(
             @PathVariable Long userId) {
 
         try {
 
             List<CardUnblockRequest> requests =
-                    requestService.getRequestsByUser(
-                            userId
-                    );
+                    requestService.getRequestsByUser(userId);
 
             return ResponseEntity.ok(
                     requests.stream()
@@ -183,9 +212,7 @@ public class CardUnblockRequestController {
     // ADMIN : VOIR TOUTES LES DEMANDES
     // =========================================================
 
-    @GetMapping(
-            "/api/admin/card-unblock-requests"
-    )
+    @GetMapping("/api/admin/card-unblock-requests")
     public ResponseEntity<?> getAllRequests() {
 
         try {
@@ -220,33 +247,23 @@ public class CardUnblockRequestController {
     )
     public ResponseEntity<?> approveRequest(
             @PathVariable Long requestId,
-            @RequestBody Map<String, Object> request) {
+            @RequestBody AdminRequestBody body) {
 
         try {
 
-            if (request.get("adminId") == null) {
+            if (body == null ||
+                    body.getAdminId() == null) {
+
                 throw new RuntimeException(
                         "Administrateur obligatoire."
                 );
             }
 
-            Long adminId =
-                    Long.valueOf(
-                            request.get("adminId").toString()
-                    );
-
-            String adminResponse = null;
-
-            if (request.get("adminResponse") != null) {
-                adminResponse =
-                        request.get("adminResponse").toString();
-            }
-
             CardUnblockRequest approved =
                     requestService.approveRequest(
                             requestId,
-                            adminId,
-                            adminResponse
+                            body.getAdminId(),
+                            body.getAdminResponse()
                     );
 
             return ResponseEntity.ok(
@@ -259,6 +276,8 @@ public class CardUnblockRequestController {
             );
 
         } catch (RuntimeException e) {
+
+            e.printStackTrace();
 
             return ResponseEntity.badRequest()
                     .body(
@@ -279,33 +298,23 @@ public class CardUnblockRequestController {
     )
     public ResponseEntity<?> rejectRequest(
             @PathVariable Long requestId,
-            @RequestBody Map<String, Object> request) {
+            @RequestBody AdminRequestBody body) {
 
         try {
 
-            if (request.get("adminId") == null) {
+            if (body == null ||
+                    body.getAdminId() == null) {
+
                 throw new RuntimeException(
                         "Administrateur obligatoire."
                 );
             }
 
-            Long adminId =
-                    Long.valueOf(
-                            request.get("adminId").toString()
-                    );
-
-            String adminResponse = null;
-
-            if (request.get("adminResponse") != null) {
-                adminResponse =
-                        request.get("adminResponse").toString();
-            }
-
             CardUnblockRequest rejected =
                     requestService.rejectRequest(
                             requestId,
-                            adminId,
-                            adminResponse
+                            body.getAdminId(),
+                            body.getAdminResponse()
                     );
 
             return ResponseEntity.ok(
@@ -318,6 +327,8 @@ public class CardUnblockRequestController {
             );
 
         } catch (RuntimeException e) {
+
+            e.printStackTrace();
 
             return ResponseEntity.badRequest()
                     .body(
@@ -337,7 +348,7 @@ public class CardUnblockRequestController {
             CardUnblockRequest request) {
 
         Map<String, Object> response =
-                new java.util.LinkedHashMap<>();
+                new LinkedHashMap<>();
 
         response.put(
                 "requestId",
