@@ -14,6 +14,7 @@ import '../widgets/smartbank_brand.dart';
 
 import 'create_account_screen.dart';
 import 'forgot_password_screen.dart';
+import 'admin_cards_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onThemeChanged;
@@ -202,8 +203,7 @@ class _LoginScreenState
   // LOGIN BIOMÉTRIQUE
   // =========================================================
 
-  Future<void>
-      _loginWithBiometric() async {
+  Future<void> _loginWithBiometric() async {
     if (!_isMobilePlatform) {
       return;
     }
@@ -217,36 +217,52 @@ class _LoginScreenState
     });
 
     try {
+      debugPrint(
+        '[BIOMETRIC LOGIN] Démarrage de l’authentification',
+      );
+
+      // =======================================================
+      // 1. AUTHENTIFICATION FACIALE / BIOMÉTRIQUE
+      // =======================================================
+
       final authenticated =
-          await _localAuth
-              .authenticate(
+          await _localAuth.authenticate(
         localizedReason:
-            'Authentifiez-vous pour accéder à SmartBank.',
-        biometricOnly:
-            true,
-        persistAcrossBackgrounding:
-            true,
+            'Utilisez votre visage ou votre empreinte pour vous connecter à SmartBank.',
+        biometricOnly: true,
+
+        // IMPORTANT :
+        // On ne garde pas l'authentification en attente
+        // si l'application passe en arrière-plan.
+        persistAcrossBackgrounding: false,
+      );
+
+      debugPrint(
+        '[BIOMETRIC LOGIN] Résultat authentification : $authenticated',
       );
 
       if (!authenticated) {
         _showMessage(
-          'Authentification biométrique annulée.',
+          'Authentification biométrique non reconnue.',
+          error: true,
         );
 
         return;
       }
+
+      // =======================================================
+      // 2. RÉCUPÉRATION DE L'IDENTIFIANT DE L'APPAREIL
+      // =======================================================
 
       final deviceInfo =
           await _deviceSessionService
               .getDeviceInformation();
 
       _deviceIdentifier =
-          (deviceInfo[
-                      'deviceIdentifier'] ??
-                  '')
+          (deviceInfo['deviceIdentifier'] ?? '')
               .toString();
 
-      if (_deviceIdentifier.isEmpty) {
+      if (_deviceIdentifier.trim().isEmpty) {
         _showMessage(
           'Impossible d’identifier cet appareil.',
           error: true,
@@ -255,31 +271,35 @@ class _LoginScreenState
         return;
       }
 
+      // =======================================================
+      // 3. VÉRIFICATION DE L'ASSOCIATION BIOMÉTRIQUE
+      // =======================================================
+
       final status =
-          await _biometricService
-              .getDeviceStatus(
+          await _biometricService.getDeviceStatus(
         _deviceIdentifier,
       );
 
       final associated =
-          status['associated'] ==
-              true;
+          status['associated'] == true;
 
       final enabled =
-          status['enabled'] ==
-              true;
+          status['enabled'] == true;
 
       final ownerUserId =
-          (status['ownerUserId']
-                  as num?)
-              ?.toInt();
+          (status['ownerUserId'] as num?)?.toInt();
+
+      debugPrint(
+        '[BIOMETRIC LOGIN] associated=$associated, '
+        'enabled=$enabled, '
+        'ownerUserId=$ownerUserId',
+      );
 
       // =======================================================
-      // AUCUN COMPTE ASSOCIÉ
+      // 4. AUCUN COMPTE ASSOCIÉ
       // =======================================================
 
-      if (!associated ||
-          ownerUserId == null) {
+      if (!associated || ownerUserId == null) {
         _showMessage(
           'Aucun compte n’est associé à la biométrie de cet appareil. '
           'Connectez-vous avec votre mot de passe pour la configurer.',
@@ -290,7 +310,7 @@ class _LoginScreenState
       }
 
       // =======================================================
-      // ASSOCIATION DÉSACTIVÉE
+      // 5. BIOMÉTRIE DÉSACTIVÉE
       // =======================================================
 
       if (!enabled) {
@@ -304,7 +324,7 @@ class _LoginScreenState
       }
 
       // =======================================================
-      // CREDENTIALS
+      // 6. RÉCUPÉRATION DES IDENTIFIANTS SÉCURISÉS
       // =======================================================
 
       final username =
@@ -332,31 +352,90 @@ class _LoginScreenState
         return;
       }
 
-      await _performLogin(
-        username:
-            username,
-        password:
-            password,
-      );
-    } on BiometricServiceException catch (e) {
-      _showMessage(
-        e.message,
-        error: true,
-      );
-    } catch (e) {
+      // =======================================================
+      // 7. CONNEXION SMARTBANK
+      // =======================================================
+
       debugPrint(
-        '[BIOMETRIC LOGIN] $e',
+        '[BIOMETRIC LOGIN] Identifiants récupérés, '
+        'connexion SmartBank...',
       );
 
+      await _performLogin(
+        username: username,
+        password: password,
+      );
+    } on BiometricServiceException catch (e) {
+      debugPrint(
+        '[BIOMETRIC LOGIN] Erreur service biométrique : ${e.message}',
+      );
+
+      if (mounted) {
+        _showMessage(
+          e.message,
+          error: true,
+        );
+      }
+    } on LocalAuthException catch (e) {
+      debugPrint(
+        '[BIOMETRIC LOGIN] LocalAuthException : '
+        '${e.code.name} - ${e.description}',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      // L'utilisateur a simplement annulé.
+      if (e.code ==
+              LocalAuthExceptionCode.userCanceled ||
+          e.code ==
+              LocalAuthExceptionCode.systemCanceled) {
+        return;
+      }
+
+      // Cas où Android bloque temporairement la biométrie.
+      if (e.code ==
+              LocalAuthExceptionCode.biometricLockout ||
+          e.code ==
+              LocalAuthExceptionCode.temporaryLockout) {
+        _showMessage(
+          'La biométrie est temporairement indisponible. '
+          'Utilisez votre mot de passe.',
+          error: true,
+        );
+
+        return;
+      }
+
       _showMessage(
-        'Erreur lors de la connexion biométrique.',
+        'La reconnaissance biométrique a échoué. '
+        'Vous pouvez utiliser votre mot de passe.',
         error: true,
       );
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[BIOMETRIC LOGIN] EXCEPTION : $e',
+      );
+
+      debugPrint(
+        '[BIOMETRIC LOGIN] TYPE : ${e.runtimeType}',
+      );
+
+      debugPrint(
+        '[BIOMETRIC LOGIN] STACK TRACE : $stackTrace',
+      );
+
+      if (mounted) {
+        _showMessage(
+          'Erreur lors de la connexion biométrique.',
+          error: true,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
-          _isBiometricLoading =
-              false;
+          _isBiometricLoading = false;
         });
       }
     }
@@ -393,10 +472,8 @@ class _LoginScreenState
 
     try {
       await _performLogin(
-        username:
-            username,
-        password:
-            password,
+        username: username,
+        password: password,
       );
     } finally {
       if (mounted) {
@@ -415,17 +492,30 @@ class _LoginScreenState
     required String username,
     required String password,
   }) async {
+    debugPrint('');
+    debugPrint('==========================================');
+    debugPrint('[LOGIN] DÉBUT DU PROCESSUS DE CONNEXION');
+    debugPrint('[LOGIN] Username : $username');
+    debugPrint('==========================================');
+
     try {
       // ======================================================
       // 1. AUTHENTIFICATION
       // ======================================================
 
+      debugPrint(
+        '[LOGIN] ÉTAPE 1 : appel AuthService.login',
+      );
+
       final User user =
           await _authService.login(
-        username:
-            username,
-        password:
-            password,
+        username: username,
+        password: password,
+      );
+
+      debugPrint(
+        '[LOGIN] ÉTAPE 1 OK : utilisateur connecté, '
+        'id=${user.id}, role=${user.role}',
       );
 
       if (!mounted) return;
@@ -434,10 +524,17 @@ class _LoginScreenState
       // 2. SOLDES
       // ======================================================
 
+      debugPrint(
+        '[LOGIN] ÉTAPE 2 : récupération des soldes',
+      );
+
       final balances =
-          await _authService
-              .fetchAccountBalances(
+          await _authService.fetchAccountBalances(
         user.id,
+      );
+
+      debugPrint(
+        '[LOGIN] ÉTAPE 2 OK : balances=$balances',
       );
 
       if (!mounted) return;
@@ -446,89 +543,163 @@ class _LoginScreenState
       // 3. SESSION APPAREIL
       // ======================================================
 
+      debugPrint(
+        '[LOGIN] ÉTAPE 3 : création session appareil',
+      );
+
       await _createDeviceSession(
         user,
+      );
+
+      debugPrint(
+        '[LOGIN] ÉTAPE 3 OK',
       );
 
       // ======================================================
       // 4. CREDENTIALS PAR COMPTE
       // ======================================================
 
+      debugPrint(
+        '[LOGIN] ÉTAPE 4 : sauvegarde identifiants biométriques',
+      );
+
       await _secureStorage.write(
         key:
             'biometric_username_user_${user.id}',
-        value:
-            username,
+        value: username,
       );
 
       await _secureStorage.write(
         key:
             'biometric_password_user_${user.id}',
-        value:
-            password,
+        value: password,
+      );
+
+      debugPrint(
+        '[LOGIN] ÉTAPE 4 OK',
       );
 
       if (!mounted) return;
 
       // ======================================================
-      // 5. NAVIGATION
+      // 5. NAVIGATION SELON LE RÔLE
       // ======================================================
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) =>
-                  MainNavigation(
-            user:
-                user,
+      debugPrint(
+        '[LOGIN] ÉTAPE 5 : navigation, role=${user.role}',
+      );
 
-            initialCourantBalance:
-                (balances['courant']
-                            as num?)
-                        ?.toDouble() ??
-                    0.0,
+      // ------------------------------------------------------
+      // ADMINISTRATION BANCAIRE
+      // ------------------------------------------------------
 
-            initialEpargneBalance:
-                (balances['epargne']
-                            as num?)
-                        ?.toDouble() ??
-                    0.0,
+      if (user.role == 'BANK_ADMIN') {
+        debugPrint(
+          '[LOGIN] BANK_ADMIN → espace Administration',
+        );
 
-            courantAccountNumber:
-                balances[
-                        'courantAccountNumber']
-                    as String? ??
-                '',
-
-            epargneAccountNumber:
-                balances[
-                        'epargneAccountNumber']
-                    as String? ??
-                '',
-
-            onThemeChanged:
-                widget
-                    .onThemeChanged,
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const AdminCardsScreen(),
           ),
-        ),
+        );
+      }
+
+      // ------------------------------------------------------
+      // CLIENT NORMAL
+      // ------------------------------------------------------
+
+      else {
+        debugPrint(
+          '[LOGIN] CLIENT → application bancaire',
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                MainNavigation(
+              user: user,
+
+              initialCourantBalance:
+                  (balances['courant'] as num?)
+                          ?.toDouble() ??
+                      0.0,
+
+              initialEpargneBalance:
+                  (balances['epargne'] as num?)
+                          ?.toDouble() ??
+                      0.0,
+
+              courantAccountNumber:
+                  balances[
+                          'courantAccountNumber']
+                      as String? ??
+                  '',
+
+              epargneAccountNumber:
+                  balances[
+                          'epargneAccountNumber']
+                      as String? ??
+                  '',
+
+              onThemeChanged:
+                  widget.onThemeChanged,
+            ),
+          ),
+        );
+      }
+
+      debugPrint(
+        '[LOGIN] ÉTAPE 5 OK',
+      );
+
+      debugPrint(
+        '[LOGIN] CONNEXION TERMINÉE AVEC SUCCÈS',
+      );
+
+      debugPrint(
+        '==========================================',
       );
     } on AuthException catch (e) {
+      debugPrint('');
+      debugPrint(
+        '[LOGIN] AuthException : $e',
+      );
+      debugPrint(
+        '[LOGIN] Message AuthException : ${e.message}',
+      );
+      debugPrint(
+        '==========================================',
+      );
+
       if (!mounted) return;
 
       _showMessage(
         e.message,
         error: true,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('');
       debugPrint(
-        'Erreur login : $e',
+        '[LOGIN] ERREUR : $e',
+      );
+      debugPrint(
+        '[LOGIN] TYPE ERREUR : ${e.runtimeType}',
+      );
+      debugPrint(
+        '[LOGIN] STACK TRACE : $stackTrace',
+      );
+      debugPrint(
+        '==========================================',
       );
 
       if (!mounted) return;
 
       _showMessage(
-        'Impossible de contacter le serveur Spring Boot.',
+        'Erreur login : $e',
         error: true,
       );
     }
@@ -842,10 +1013,12 @@ class _LoginScreenState
                       // ==========================================
 
                       const Center(
-  child: SmartBankBrand(
-    iconSize: 62,
-  ),
-),
+                        child:
+                            SmartBankBrand(
+                          iconSize:
+                              62,
+                        ),
+                      ),
 
                       const SizedBox(
                         height:

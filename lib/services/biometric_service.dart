@@ -1,5 +1,5 @@
 import '../services/api_service.dart';
-
+import 'package:flutter/foundation.dart';
 class BiometricServiceException implements Exception {
   final String message;
   final int? statusCode;
@@ -28,14 +28,25 @@ class BiometricService {
     String deviceIdentifier,
   ) async {
     try {
-      final response =
-          await _apiService.get(
+      debugPrint(
+        '[BIOMETRIC SERVICE] Vérification appareil : $deviceIdentifier',
+      );
+
+      final response = await _apiService.get(
         '/api/biometric/device'
         '?deviceIdentifier=${Uri.encodeQueryComponent(deviceIdentifier)}',
       );
 
+      debugPrint(
+        '[BIOMETRIC SERVICE] Statut appareil : ${response.statusCode}',
+      );
+
       return _handleResponse(response);
     } catch (e) {
+      debugPrint(
+        '[BIOMETRIC SERVICE] Erreur getDeviceStatus : $e',
+      );
+
       if (e is BiometricServiceException) {
         rethrow;
       }
@@ -54,13 +65,24 @@ class BiometricService {
     int userId,
   ) async {
     try {
-      final response =
-          await _apiService.get(
+      debugPrint(
+        '[BIOMETRIC SERVICE] Vérification utilisateur : $userId',
+      );
+
+      final response = await _apiService.get(
         '/api/biometric/user/$userId',
+      );
+
+      debugPrint(
+        '[BIOMETRIC SERVICE] Statut utilisateur : ${response.statusCode}',
       );
 
       return _handleResponse(response);
     } catch (e) {
+      debugPrint(
+        '[BIOMETRIC SERVICE] Erreur getUserStatus : $e',
+      );
+
       if (e is BiometricServiceException) {
         rethrow;
       }
@@ -80,8 +102,12 @@ class BiometricService {
     required String deviceIdentifier,
   }) async {
     try {
-      final response =
-          await _apiService.post(
+      debugPrint(
+        '[BIOMETRIC SERVICE] Activation biométrie '
+        'userId=$userId',
+      );
+
+      final response = await _apiService.post(
         '/api/biometric/enable',
         body: {
           'userId': userId,
@@ -89,8 +115,16 @@ class BiometricService {
         },
       );
 
+      debugPrint(
+        '[BIOMETRIC SERVICE] Activation : ${response.statusCode}',
+      );
+
       return _handleResponse(response);
     } catch (e) {
+      debugPrint(
+        '[BIOMETRIC SERVICE] Erreur enable : $e',
+      );
+
       if (e is BiometricServiceException) {
         rethrow;
       }
@@ -110,8 +144,12 @@ class BiometricService {
     required String deviceIdentifier,
   }) async {
     try {
-      final response =
-          await _apiService.post(
+      debugPrint(
+        '[BIOMETRIC SERVICE] Désactivation biométrie '
+        'userId=$userId',
+      );
+
+      final response = await _apiService.post(
         '/api/biometric/disable',
         body: {
           'userId': userId,
@@ -119,8 +157,16 @@ class BiometricService {
         },
       );
 
+      debugPrint(
+        '[BIOMETRIC SERVICE] Désactivation : ${response.statusCode}',
+      );
+
       return _handleResponse(response);
     } catch (e) {
+      debugPrint(
+        '[BIOMETRIC SERVICE] Erreur disable : $e',
+      );
+
       if (e is BiometricServiceException) {
         rethrow;
       }
@@ -140,14 +186,12 @@ class BiometricService {
   ) {
     Map<String, dynamic> data = {};
 
-    final decoded =
-        _apiService.decodeResponse(
+    final decoded = _apiService.decodeResponse(
       response,
     );
 
     if (decoded is Map) {
-      data =
-          Map<String, dynamic>.from(
+      data = Map<String, dynamic>.from(
         decoded,
       );
     }

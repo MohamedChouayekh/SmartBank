@@ -447,6 +447,23 @@ class _PaymentsScreenState
         );
   }
 
+  String _formatRadarImmatriculation(
+    String value,
+  ) {
+    final matricule =
+        _normalizeImmatriculation(value);
+
+    final match = RegExp(
+      r'^([0-9]{1,3})TUN([0-9]{1,4})$',
+    ).firstMatch(matricule);
+
+    if (match == null) {
+      return matricule;
+    }
+
+    return '${match.group(1)} TUN ${match.group(2)}';
+  }
+
   bool _isValidTunisianRegistration(
     String value,
   ) {
@@ -839,119 +856,108 @@ class _PaymentsScreenState
   // =========================================================
 
   Future<void> _searchRadarFines() async {
-    if (!_formKey.currentState!
-        .validate()) {
-      return;
-    }
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
 
-    final registration =
-        _normalizeImmatriculation(
-      _referenceController.text,
+  final registration = _normalizeImmatriculation(
+    _referenceController.text,
+  );
+debugPrint('RADAR - Saisie : ${_referenceController.text}');
+debugPrint('RADAR - Immatriculation envoyée : $registration');
+  setState(() {
+    _isSearchingRadar = true;
+    _selectedRadarFine = null;
+  });
+
+  try {
+    final encodedRegistration = Uri.encodeQueryComponent(
+      registration,
     );
+debugPrint('RADAR - Immatriculation encodée : $encodedRegistration');
+    final response = await _apiService.get(
+      '/api/amendes?immatriculation=$encodedRegistration',
+    );
+debugPrint('RADAR - URL appelée : /api/amendes?immatriculation=$encodedRegistration');
+debugPrint('RADAR - Status : ${response.statusCode}');
+debugPrint('RADAR - Réponse : ${response.body}');
+    if (!mounted) return;
 
-    setState(() {
-      _isSearchingRadar = true;
-      _selectedRadarFine = null;
-    });
-
-    try {
-      final response =
-          await _apiService.get(
-        '/api/amendes?immatriculation=$registration',
+    if (response.statusCode == 200) {
+      final data = _apiService.decodeResponse(
+        response,
       );
 
-      if (!mounted) return;
+      final List<RadarFine> fines = [];
 
-      if (response.statusCode == 200) {
-        final data =
-            _apiService.decodeResponse(
-          response,
-        );
-
-        final List<RadarFine>
-            fines = [];
-
-        if (data is List) {
-          for (final item in data) {
-            if (item is Map) {
-              fines.add(
-                RadarFine.fromJson(
-                  Map<String, dynamic>.from(
-                    item,
-                  ),
-                ),
-              );
-            }
+      if (data is List) {
+        for (final item in data) {
+          if (item is Map) {
+            fines.add(
+              RadarFine.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            );
           }
         }
-
-        setState(() {
-          _radarFines =
-              fines;
-          _radarSearched =
-              true;
-        });
-      } else {
-        setState(() {
-          _radarFines = [];
-          _radarSearched =
-              true;
-        });
-
-        _showSnack(
-          'Erreur lors de la recherche des infractions.',
-          error: true,
-        );
       }
-    } catch (e) {
-      debugPrint(
-        'Erreur recherche radar : $e',
-      );
-
-      if (!mounted) return;
 
       setState(() {
+        _radarFines = fines;
+        _radarSearched = true;
+      });
+    } else {
+      setState(() {
         _radarFines = [];
-        _radarSearched =
-            true;
+        _radarSearched = true;
       });
 
       _showSnack(
-        'Impossible de contacter le serveur.',
+        'Erreur lors de la recherche des infractions.',
         error: true,
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSearchingRadar =
-              false;
-        });
-      }
     }
-  }
+  } catch (e) {
+    debugPrint(
+      'Erreur recherche radar : $e',
+    );
 
-  List<RadarFine>
-      get _matchingRadarFines {
-    if (!_radarSearched) {
-      return [];
-    }
+    if (!mounted) return;
 
-    return _radarFines;
-  }
-
-  void _selectRadarFine(
-    RadarFine fine,
-  ) {
     setState(() {
-      _selectedRadarFine =
-          fine;
-      _amountController.text =
-          fine.amount
-              .toStringAsFixed(
-        3,
-      );
+      _radarFines = [];
+      _radarSearched = true;
     });
+
+    _showSnack(
+      'Impossible de contacter le serveur.',
+      error: true,
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSearchingRadar = false;
+      });
+    }
   }
+}
+
+List<RadarFine> get _matchingRadarFines {
+  if (!_radarSearched) {
+    return [];
+  }
+
+  return _radarFines;
+}
+
+void _selectRadarFine(
+  RadarFine fine,
+) {
+  setState(() {
+    _selectedRadarFine = fine;
+    _amountController.text = fine.amount.toStringAsFixed(3);
+  });
+}
 
   // =========================================================
   // PAYER RADAR

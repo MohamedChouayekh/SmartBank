@@ -27,6 +27,32 @@ public class Card {
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
 
+    // =========================================================
+    // CARTE REMPLACÉE
+    // =========================================================
+    //
+    // Si cette carte est une carte de renouvellement,
+    // replacedCard contient l'ancienne carte.
+    //
+    // Exemple :
+    //
+    // Ancienne carte :
+    // id = 10
+    // expiry = 09/26
+    // status = EXPIRED
+    //
+    // Nouvelle carte :
+    // id = 15
+    // expiry = 09/29
+    // status = ACTIVE
+    // replacedCard = carte id 10
+    //
+    // =========================================================
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "replaced_card_id")
+    private Card replacedCard;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -84,6 +110,14 @@ public class Card {
 
     public void setAccount(Account account) {
         this.account = account;
+    }
+
+    public Card getReplacedCard() {
+        return replacedCard;
+    }
+
+    public void setReplacedCard(Card replacedCard) {
+        this.replacedCard = replacedCard;
     }
 
     public LocalDateTime getCreatedAt() {

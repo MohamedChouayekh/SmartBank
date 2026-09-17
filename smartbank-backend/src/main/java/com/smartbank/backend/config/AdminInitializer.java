@@ -22,36 +22,36 @@ public class AdminInitializer {
                     .orElse(null);
 
             if (admin == null) {
+
                 admin = new User();
 
                 admin.setUsername("admin");
-                admin.setPassword(
-                        passwordEncoder.encode("AdminBank!2026")
-                );
                 admin.setEmail("admin@smartbank.tn");
-                admin.setFullName("SmartBank Administrateur");
+                admin.setFullName(
+                        "SmartBank Administrateur"
+                );
                 admin.setPhoneNumber("00000000");
                 admin.setAddress("SmartBank");
-                admin.setEnabled(true);
-                admin.setRole("BANK_ADMIN");
-
-                userRepository.save(admin);
-
-                System.out.println(
-                        "[ADMIN] Compte administrateur créé avec succès."
-                );
-
-            } else {
-
-                admin.setRole("BANK_ADMIN");
-                admin.setEnabled(true);
-
-                userRepository.save(admin);
-
-                System.out.println(
-                        "[ADMIN] Compte administrateur déjà existant."
-                );
             }
+
+            // =====================================================
+            // CONFIGURATION DU COMPTE ADMIN
+            // =====================================================
+
+            admin.setPassword(
+                    passwordEncoder.encode(
+                            "AdminBank!2026"
+                    )
+            );
+
+            admin.setRole("BANK_ADMIN");
+            admin.setEnabled(true);
+
+            userRepository.save(admin);
+
+            System.out.println(
+                    "[ADMIN] Compte administrateur configuré avec succès."
+            );
         };
     }
 }

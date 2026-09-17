@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../services/otp_service.dart';
@@ -79,15 +82,35 @@ class _ForgotPasswordScreenState
   }) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            error ? Colors.red : null,
-        duration:
-            const Duration(seconds: 4),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor:
+              error ? Colors.red : null,
+          duration:
+              const Duration(seconds: 4),
+        ),
+      );
+  }
+
+  // =========================================================
+  // MESSAGE ERREUR RESEAU
+  // =========================================================
+
+  String _networkErrorMessage(Object error) {
+    if (error is SocketException) {
+      return 'Impossible de contacter le serveur SmartBank. '
+          'Vérifiez votre connexion Internet.';
+    }
+
+    if (error is TimeoutException) {
+      return 'Le serveur SmartBank met trop de temps à répondre. '
+          'Veuillez réessayer.';
+    }
+
+    return 'Impossible de contacter le serveur SmartBank.';
   }
 
   // =========================================================
@@ -120,6 +143,8 @@ class _ForgotPasswordScreenState
       return;
     }
 
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _isLoading = true;
     });
@@ -138,7 +163,7 @@ class _ForgotPasswordScreenState
       });
 
       _showMessage(
-        'Code de vérification envoyé par email.',
+        'Code de vérification envoyé par email ! Vérifiez aussi vos spams.',
       );
     } on OtpException catch (e) {
       if (!mounted) return;
@@ -147,11 +172,25 @@ class _ForgotPasswordScreenState
         e.message,
         error: true,
       );
+    } on SocketException catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        _networkErrorMessage(e),
+        error: true,
+      );
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        _networkErrorMessage(e),
+        error: true,
+      );
     } catch (e) {
       if (!mounted) return;
 
       _showMessage(
-        'Impossible de contacter le serveur. Vérifiez que Spring Boot est démarré.',
+        _networkErrorMessage(e),
         error: true,
       );
     } finally {
@@ -174,6 +213,14 @@ class _ForgotPasswordScreenState
     final otp =
         otpController.text.trim();
 
+    if (email.isEmpty) {
+      _showMessage(
+        'Adresse e-mail introuvable.',
+        error: true,
+      );
+      return;
+    }
+
     if (otp.isEmpty) {
       _showMessage(
         'Veuillez entrer le code de vérification.',
@@ -195,6 +242,8 @@ class _ForgotPasswordScreenState
     if (_isLoading) {
       return;
     }
+
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _isLoading = true;
@@ -222,11 +271,25 @@ class _ForgotPasswordScreenState
         e.message,
         error: true,
       );
+    } on SocketException catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        _networkErrorMessage(e),
+        error: true,
+      );
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        _networkErrorMessage(e),
+        error: true,
+      );
     } catch (e) {
       if (!mounted) return;
 
       _showMessage(
-        'Impossible de contacter le serveur.',
+        _networkErrorMessage(e),
         error: true,
       );
     } finally {
@@ -330,6 +393,8 @@ class _ForgotPasswordScreenState
       return;
     }
 
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _isLoading = true;
     });
@@ -363,11 +428,25 @@ class _ForgotPasswordScreenState
         e.message,
         error: true,
       );
+    } on SocketException catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        _networkErrorMessage(e),
+        error: true,
+      );
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        _networkErrorMessage(e),
+        error: true,
+      );
     } catch (e) {
       if (!mounted) return;
 
       _showMessage(
-        'Impossible de contacter le serveur.',
+        _networkErrorMessage(e),
         error: true,
       );
     } finally {
@@ -624,7 +703,8 @@ class _ForgotPasswordScreenState
                             ),
                             const Expanded(
                               child: Text(
-                                'Un code de vérification a été envoyé à votre adresse e-mail.',
+                                'Un code de vérification a été envoyé à votre adresse e-mail. '
+                                'Pensez à vérifier vos spams si vous ne le voyez pas.',
                               ),
                             ),
                           ],

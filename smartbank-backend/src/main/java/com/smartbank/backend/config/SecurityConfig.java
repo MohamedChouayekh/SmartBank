@@ -1,9 +1,14 @@
 package com.smartbank.backend.config;
 
+import com.smartbank.backend.entity.User;
+import com.smartbank.backend.repository.UserRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -16,46 +21,129 @@ import java.util.List;
 @Configuration
 public class SecurityConfig {
 
+    // =========================================================
+    // SECURITY FILTER CHAIN
+    // =========================================================
+
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http
     ) throws Exception {
 
         http
-                // =====================================================
+                // -------------------------------------------------
                 // CSRF
-                // =====================================================
+                // -------------------------------------------------
                 .csrf(csrf -> csrf.disable())
 
-                // =====================================================
+                // -------------------------------------------------
                 // CORS
-                // =====================================================
+                // -------------------------------------------------
                 .cors(cors -> cors.configurationSource(
                         corsConfigurationSource()
                 ))
 
-                // =====================================================
+                // -------------------------------------------------
                 // AUTORISATION
-                // =====================================================
+                // -------------------------------------------------
                 .authorizeHttpRequests(auth -> auth
 
-                        // Requêtes preflight envoyées par les navigateurs
+                        // OPTIONS autorisé pour CORS
                         .requestMatchers(
                                 HttpMethod.OPTIONS,
                                 "/**"
                         ).permitAll()
 
-                        // Toutes les API SmartBank
+                        // =================================================
+                        // ADMIN UNIQUEMENT
+                        // =================================================
+
+                        .requestMatchers(
+                                "/api/admin/**",
+                                "/api/cards/admin/**"
+                        ).hasRole("BANK_ADMIN")
+
+                        // =================================================
+                        // API PUBLIQUES / CLIENT
+                        // =================================================
+
                         .requestMatchers(
                                 "/api/**"
                         ).permitAll()
 
-                        // Autres endpoints
+                        // -------------------------------------------------
+                        // Tout le reste
+                        // -------------------------------------------------
+
                         .anyRequest().permitAll()
-                );
+                )
+
+                // =========================================================
+                // HTTP BASIC
+                // =========================================================
+                //
+                // Utilisé uniquement lorsqu'une route ADMIN est appelée.
+                //
+                .httpBasic(Customizer.withDefaults());
 
         return http.build();
     }
+
+    // =========================================================
+    // USER DETAILS SERVICE
+    // =========================================================
+    //
+    // Spring Security récupère l'utilisateur directement depuis
+    // la table users.
+    //
+    // Le rôle BANK_ADMIN présent dans User.role devient :
+    //
+    // ROLE_BANK_ADMIN
+    //
+    // ce qui permet à hasRole("BANK_ADMIN") de fonctionner.
+    // =========================================================
+
+    @Bean
+    public UserDetailsService userDetailsService(
+            UserRepository userRepository
+    ) {
+
+        return username -> {
+
+            User user = userRepository
+                    .findByUsername(username)
+                    .orElseThrow(() ->
+                            new UsernameNotFoundException(
+                                    "Utilisateur introuvable."
+                            )
+                    );
+
+            if (!user.isEnabled()) {
+                throw new UsernameNotFoundException(
+                        "Utilisateur désactivé."
+                );
+            }
+
+            String role = user.getRole();
+
+            if (role == null ||
+                    role.trim().isEmpty()) {
+
+                role = "CLIENT";
+            }
+
+            return org.springframework.security.core.userdetails.User
+                    .withUsername(user.getUsername())
+                    .password(user.getPassword())
+                    .roles(role.trim())
+                    .disabled(!user.isEnabled())
+                    .build();
+        };
+    }
+
+    // =========================================================
+    // CORS
+    // =========================================================
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -63,21 +151,6 @@ public class SecurityConfig {
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
-        // =====================================================
-        // ORIGINES AUTORISÉES
-        // =====================================================
-        //
-        // Flutter Web s'exécute actuellement depuis une adresse
-        // du type :
-        //
-        // http://localhost:65101
-        //
-        // Le port peut changer, donc on autorise les origines
-        // localhost quel que soit leur port.
-        //
-        // On autorise également les autres origines nécessaires
-        // au fonctionnement de l'application.
-        //
         configuration.setAllowedOriginPatterns(
                 List.of(
                         "http://localhost:*",
@@ -87,9 +160,6 @@ public class SecurityConfig {
                 )
         );
 
-        // =====================================================
-        // MÉTHODES HTTP AUTORISÉES
-        // =====================================================
         configuration.setAllowedMethods(
                 List.of(
                         HttpMethod.GET.name(),
@@ -101,37 +171,18 @@ public class SecurityConfig {
                 )
         );
 
-        // =====================================================
-        // HEADERS AUTORISÉS
-        // =====================================================
         configuration.setAllowedHeaders(
                 List.of("*")
         );
 
-        // =====================================================
-        // HEADERS EXPOSÉS AU CLIENT
-        // =====================================================
         configuration.setExposedHeaders(
                 List.of("*")
         );
 
-        // =====================================================
-        // CREDENTIALS
-        // =====================================================
-        //
-        // SmartBank n'utilise pas de cookies HTTP pour
-        // l'authentification.
-        //
         configuration.setAllowCredentials(false);
 
-        // =====================================================
-        // CACHE DES REQUÊTES PREFLIGHT
-        // =====================================================
         configuration.setMaxAge(3600L);
 
-        // =====================================================
-        // APPLICATION DE LA CONFIGURATION À TOUS LES ENDPOINTS
-        // =====================================================
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
@@ -143,8 +194,13 @@ public class SecurityConfig {
         return source;
     }
 
+    // =========================================================
+    // PASSWORD ENCODER
+    // =========================================================
+
     @Bean
     public PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
     }
 }

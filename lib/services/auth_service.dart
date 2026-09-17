@@ -22,71 +22,87 @@ class AuthService {
   // ===========================================================
 
   Future<User> login({
-    required String username,
-    required String password,
-  }) async {
-    try {
-      final response = await _apiService.post(
-        '/api/users/login',
-        body: {
-          'username': username,
-          'password': password,
-        },
-      );
+  required String username,
+  required String password,
+}) async {
+  try {
+    print('[AUTH] Début login');
+    print('[AUTH] URL : ${ApiService.baseUrl}/api/users/login');
+    print('[AUTH] Username : $username');
 
-      // -------------------------------------------------------
-      // LOGIN REUSSI
-      // -------------------------------------------------------
+    final response = await _apiService.post(
+      '/api/users/login',
+      body: {
+        'username': username,
+        'password': password,
+      },
+    );
 
-      if (response.statusCode == 200) {
-        final data = _apiService.decodeResponse(response);
+    print('[AUTH] Status code : ${response.statusCode}');
+    print('[AUTH] Response body : ${response.body}');
 
-        if (data is! Map<String, dynamic>) {
-          throw AuthException(
-            'Réponse invalide du serveur.',
-          );
-        }
+    // -------------------------------------------------------
+    // LOGIN REUSSI
+    // -------------------------------------------------------
 
-        return _userFromJson(data);
-      }
+    if (response.statusCode == 200) {
+      final data = _apiService.decodeResponse(response);
 
-      // -------------------------------------------------------
-      // IDENTIFIANT / MOT DE PASSE INCORRECT
-      // -------------------------------------------------------
-
-      if (response.statusCode == 401) {
+      if (data is! Map<String, dynamic>) {
         throw AuthException(
-          'Identifiant ou mot de passe incorrect.',
+          'Réponse invalide du serveur.',
         );
       }
 
-      // -------------------------------------------------------
-      // UTILISATEUR NON TROUVE
-      // -------------------------------------------------------
+      print('[AUTH] Login réussi');
 
-      if (response.statusCode == 404) {
-        throw AuthException(
-          'Utilisateur introuvable.',
-        );
-      }
+      return _userFromJson(data);
+    }
 
-      // -------------------------------------------------------
-      // AUTRE ERREUR
-      // -------------------------------------------------------
+    // -------------------------------------------------------
+    // IDENTIFIANT / MOT DE PASSE INCORRECT
+    // -------------------------------------------------------
 
+    if (response.statusCode == 401) {
       throw AuthException(
-        _apiService.getErrorMessage(response),
-      );
-    } catch (e) {
-      if (e is AuthException) {
-        rethrow;
-      }
-
-      throw AuthException(
-        'Impossible de contacter le serveur Spring Boot.',
+        'Identifiant ou mot de passe incorrect.',
       );
     }
+
+    // -------------------------------------------------------
+    // UTILISATEUR NON TROUVE
+    // -------------------------------------------------------
+
+    if (response.statusCode == 404) {
+      throw AuthException(
+        'Utilisateur introuvable.',
+      );
+    }
+
+    // -------------------------------------------------------
+    // AUTRE ERREUR HTTP
+    // -------------------------------------------------------
+
+    final errorMessage = _apiService.getErrorMessage(response);
+
+    print('[AUTH] Erreur HTTP : $errorMessage');
+
+    throw AuthException(errorMessage);
+  } catch (e, stackTrace) {
+    print('[AUTH] EXCEPTION : $e');
+    print('[AUTH] TYPE : ${e.runtimeType}');
+    print('[AUTH] STACK TRACE : $stackTrace');
+
+    if (e is AuthException) {
+      rethrow;
+    }
+
+    // Pour le diagnostic, on conserve l'erreur réelle.
+    throw AuthException(
+      'Erreur de connexion : $e',
+    );
   }
+}
 
   // ===========================================================
   // RECUPERER LES COMPTES D'UN UTILISATEUR
@@ -195,14 +211,18 @@ class AuthService {
     }
 
     return User(
-      id: _parseInt(data['id']),
-      firstName: firstName,
-      lastName: lastName,
-      email: (data['email'] ?? '').toString(),
-      phone: (data['phoneNumber'] ?? '').toString(),
-      username: (data['username'] ?? '').toString(),
-      address: (data['address'] ?? '').toString(),
-    );
+  id: _parseInt(data['id']),
+  firstName: firstName,
+  lastName: lastName,
+  email: (data['email'] ?? '').toString(),
+  phone: (data['phoneNumber'] ?? '').toString(),
+  username: (data['username'] ?? '').toString(),
+  address: (data['address'] ?? '').toString(),
+  role: (data['role'] ?? 'CLIENT')
+      .toString()
+      .trim()
+      .toUpperCase(),
+);
   }
 
   int _parseInt(dynamic value) {

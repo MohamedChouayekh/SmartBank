@@ -22,12 +22,10 @@ class AccountsScreen extends StatefulWidget {
   });
 
   @override
-  State<AccountsScreen> createState() =>
-      _AccountsScreenState();
+  State<AccountsScreen> createState() => _AccountsScreenState();
 }
 
-class _AccountsScreenState
-    extends State<AccountsScreen> {
+class _AccountsScreenState extends State<AccountsScreen> {
   // =========================================================
   // API
   // =========================================================
@@ -38,17 +36,12 @@ class _AccountsScreenState
   // CONFIGURATION
   // =========================================================
 
-  static const Color blue =
-      Color(0xFF0B5AA6);
+  static const Color blue = Color(0xFF0B5AA6);
+  static const Color darkBlue = Color(0xFF06457E);
+  static const Color green = Color(0xFF087A5B);
+  static const Color lightGreen = Color(0xFF32B67A);
 
-  static const Color darkBlue =
-      Color(0xFF06457E);
-
-  static const Color green =
-      Color(0xFF087A5B);
-
-  static const double interestRate =
-      0.02;
+  static const double interestRate = 0.02;
 
   bool _isLoading = true;
   bool _isTransferring = false;
@@ -84,16 +77,14 @@ class _AccountsScreenState
       return;
     }
 
-    if (oldWidget.courantBalance !=
-            widget.courantBalance &&
+    if (oldWidget.courantBalance != widget.courantBalance &&
         widget.courantBalance != _courant) {
       setState(() {
         _courant = widget.courantBalance;
       });
     }
 
-    if (oldWidget.epargneBalance !=
-            widget.epargneBalance &&
+    if (oldWidget.epargneBalance != widget.epargneBalance &&
         widget.epargneBalance != _epargne) {
       setState(() {
         _epargne = widget.epargneBalance;
@@ -125,8 +116,7 @@ class _AccountsScreenState
         );
       }
 
-      final decoded =
-          _apiService.decodeResponse(response);
+      final decoded = _apiService.decodeResponse(response);
 
       if (decoded is! List) {
         throw Exception(
@@ -143,31 +133,25 @@ class _AccountsScreenState
       for (final item in decoded) {
         if (item is! Map) continue;
 
-        final map =
-            Map<String, dynamic>.from(item);
+        final map = Map<String, dynamic>.from(item);
 
-        final type =
-            (map['type'] ?? '')
-                .toString()
-                .trim()
-                .toUpperCase();
+        final type = (map['type'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
 
-        final number =
-            (map['accountNumber'] ?? '')
-                .toString()
-                .trim();
+        final number = (map['accountNumber'] ?? '')
+            .toString()
+            .trim();
 
-        final rawBalance =
-            map['balance'];
+        final rawBalance = map['balance'];
 
-        final balance =
-            rawBalance is num
-                ? rawBalance.toDouble()
-                : double.tryParse(
-                      rawBalance?.toString() ??
-                          '',
-                    ) ??
-                    0.0;
+        final balance = rawBalance is num
+            ? rawBalance.toDouble()
+            : double.tryParse(
+                  rawBalance?.toString() ?? '',
+                ) ??
+                0.0;
 
         if (type == 'CURRENT') {
           courantBalance = balance;
@@ -183,18 +167,13 @@ class _AccountsScreenState
       setState(() {
         _courant = courantBalance;
         _epargne = epargneBalance;
-        _courantAccountNumber =
-            courantNumber;
-        _epargneAccountNumber =
-            epargneNumber;
+        _courantAccountNumber = courantNumber;
+        _epargneAccountNumber = epargneNumber;
         _isLoading = false;
       });
 
-      widget.onCourantBalanceChanged
-          ?.call(courantBalance);
-
-      widget.onEpargneBalanceChanged
-          ?.call(epargneBalance);
+      widget.onCourantBalanceChanged?.call(courantBalance);
+      widget.onEpargneBalanceChanged?.call(epargneBalance);
     } catch (e) {
       debugPrint(
         'Erreur chargement comptes : $e',
@@ -206,8 +185,9 @@ class _AccountsScreenState
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).clearSnackBars();
+
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'Impossible de charger vos comptes.',
@@ -234,18 +214,15 @@ class _AccountsScreenState
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$title copié.'),
-        behavior:
-            SnackBarBehavior.floating,
-        margin:
-            const EdgeInsets.all(16),
-        shape:
-            RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(12),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );
@@ -262,23 +239,18 @@ class _AccountsScreenState
     required Color color,
     required bool isDark,
   }) {
-    final number =
-        accountNumber?.trim() ?? '';
-
+    final number = accountNumber?.trim() ?? '';
     final hasNumber = number.isNotEmpty;
 
     return Container(
       width: double.infinity,
-      margin:
-          const EdgeInsets.only(bottom: 18),
-      padding:
-          const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark
             ? const Color(0xFF182236)
             : Colors.white,
-        borderRadius:
-            BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: color.withValues(
             alpha: 0.12,
@@ -287,13 +259,10 @@ class _AccountsScreenState
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(
-              alpha: isDark
-                  ? 0.16
-                  : 0.045,
+              alpha: isDark ? 0.16 : 0.045,
             ),
             blurRadius: 12,
-            offset:
-                const Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -302,16 +271,11 @@ class _AccountsScreenState
           Container(
             width: 46,
             height: 46,
-            decoration:
-                BoxDecoration(
-              color:
-                  color.withValues(
+            decoration: BoxDecoration(
+              color: color.withValues(
                 alpha: 0.10,
               ),
-              borderRadius:
-                  BorderRadius.circular(
-                14,
-              ),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               icon,
@@ -327,10 +291,8 @@ class _AccountsScreenState
               children: [
                 Text(
                   title,
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.w700,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
                     fontSize: 12.5,
                   ),
                 ),
@@ -341,22 +303,18 @@ class _AccountsScreenState
                       : 'Numéro indisponible',
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight:
-                        FontWeight.w600,
-                    letterSpacing:
-                        0.4,
-                    color:
-                        hasNumber
-                            ? null
-                            : Colors.grey,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                    color: hasNumber
+                        ? null
+                        : Colors.grey,
                   ),
                 ),
               ],
             ),
           ),
           IconButton(
-            tooltip:
-                'Copier le numéro',
+            tooltip: 'Copier le numéro',
             onPressed: hasNumber
                 ? () {
                     _copyAccountNumber(
@@ -365,8 +323,7 @@ class _AccountsScreenState
                     );
                   }
                 : null,
-            icon:
-                const Icon(
+            icon: const Icon(
               Icons.copy_outlined,
               size: 20,
             ),
@@ -390,14 +347,11 @@ class _AccountsScreenState
   }) {
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin:
-              Alignment.topLeft,
-          end:
-              Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
             color,
             color.withValues(
@@ -405,17 +359,14 @@ class _AccountsScreenState
             ),
           ],
         ),
-        borderRadius:
-            BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color:
-                color.withValues(
+            color: color.withValues(
               alpha: 0.24,
             ),
             blurRadius: 20,
-            offset:
-                const Offset(0, 9),
+            offset: const Offset(0, 9),
           ),
         ],
       ),
@@ -424,16 +375,12 @@ class _AccountsScreenState
           Positioned(
             right: -35,
             top: -45,
-            child:
-                Container(
+            child: Container(
               width: 145,
               height: 145,
-              decoration:
-                  BoxDecoration(
-                shape:
-                    BoxShape.circle,
-                color:
-                    Colors.white.withValues(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(
                   alpha: 0.06,
                 ),
               ),
@@ -448,65 +395,45 @@ class _AccountsScreenState
                   Container(
                     width: 44,
                     height: 44,
-                    decoration:
-                        BoxDecoration(
-                      color:
-                          Colors.white.withValues(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(
                         alpha: 0.15,
                       ),
                       borderRadius:
-                          BorderRadius.circular(
-                        13,
-                      ),
+                          BorderRadius.circular(13),
                     ),
-                    child:
-                        Icon(
+                    child: Icon(
                       icon,
-                      color:
-                          Colors.white,
+                      color: Colors.white,
                       size: 23,
                     ),
                   ),
-                  const SizedBox(
-                    width: 12,
-                  ),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child:
-                        Column(
+                    child: Column(
                       crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                          CrossAxisAlignment.start,
                       children: [
                         Text(
                           title,
-                          style:
-                              const TextStyle(
-                            color:
-                                Colors.white,
-                            fontSize:
-                                16,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
                             fontWeight:
-                                FontWeight
-                                    .w700,
+                                FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(
-                          height: 3,
-                        ),
+                        const SizedBox(height: 3),
                         Text(
                           number.isEmpty
                               ? 'Compte SmartBank'
                               : number,
-                          style:
-                              TextStyle(
+                          style: TextStyle(
                             color:
-                                Colors.white
-                                    .withValues(
-                              alpha:
-                                  0.72,
+                                Colors.white.withValues(
+                              alpha: 0.72,
                             ),
-                            fontSize:
-                                11,
+                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -514,33 +441,23 @@ class _AccountsScreenState
                   ),
                 ],
               ),
-              const SizedBox(
-                height: 24,
-              ),
+              const SizedBox(height: 24),
               Text(
                 'Solde disponible',
-                style:
-                    TextStyle(
-                  color:
-                      Colors.white.withValues(
+                style: TextStyle(
+                  color: Colors.white.withValues(
                     alpha: 0.72,
                   ),
                   fontSize: 12,
                 ),
               ),
-              const SizedBox(
-                height: 4,
-              ),
+              const SizedBox(height: 4),
               Text(
                 '${balance.toStringAsFixed(3)} TND',
-                style:
-                    const TextStyle(
-                  color:
-                      Colors.white,
-                  fontSize:
-                      29,
-                  fontWeight:
-                      FontWeight.w800,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 29,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -551,7 +468,7 @@ class _AccountsScreenState
   }
 
   // =========================================================
-  // DIALOGUE TRANSFERT INTERNE
+  // EXÉCUTER LE VIREMENT
   // =========================================================
 
   Future<void> _executeInternalTransfer({
@@ -560,14 +477,11 @@ class _AccountsScreenState
     required double amount,
     required String label,
   }) async {
-    final response =
-        await _apiService.post(
+    final response = await _apiService.post(
       '/api/transactions/transfer',
       body: {
-        'fromAccountNumber':
-            fromAccountNumber,
-        'toAccountNumber':
-            toAccountNumber,
+        'fromAccountNumber': fromAccountNumber,
+        'toAccountNumber': toAccountNumber,
         'amount': amount,
         'label': label,
       },
@@ -578,8 +492,7 @@ class _AccountsScreenState
     final decoded =
         _apiService.decodeResponse(response);
 
-    if (decoded
-        is Map<String, dynamic>) {
+    if (decoded is Map<String, dynamic>) {
       data = decoded;
     }
 
@@ -592,46 +505,43 @@ class _AccountsScreenState
     }
   }
 
+  // =========================================================
+  // FENÊTRE TRANSFERT INTERNE
+  // =========================================================
+
   void _showInternalTransferDialog() {
-    if (_courantAccountNumber ==
-            null ||
-        _epargneAccountNumber ==
-            null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+    if (_courantAccountNumber == null ||
+        _epargneAccountNumber == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'Vous devez avoir un compte courant et un compte épargne.',
           ),
-          backgroundColor:
-              Colors.orange,
+          backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final amountController =
-        TextEditingController();
+    final pageContext = context;
 
-    bool fromCourantToEpargne =
-        true;
+    final amountController = TextEditingController();
 
+    bool fromCourantToEpargne = true;
     bool isSubmitting = false;
 
     showDialog(
-      context: context,
+      context: pageContext,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (
             context,
             setDialogState,
           ) {
-            final theme =
-                Theme.of(context);
+            final theme = Theme.of(context);
 
             final isDark =
-                theme.brightness ==
-                    Brightness.dark;
+                theme.brightness == Brightness.dark;
 
             final sourceBalance =
                 fromCourantToEpargne
@@ -645,49 +555,35 @@ class _AccountsScreenState
 
             final accent =
                 fromCourantToEpargne
-                    ? const Color(
-                        0xFF087A5B,
-                      )
-                    : const Color(
-                        0xFF32B67A,
-                      );
+                    ? green
+                    : lightGreen;
+
+            final isSavingsToCurrent =
+                !fromCourantToEpargne;
 
             return AlertDialog(
-              shape:
-                  RoundedRectangleBorder(
+              shape: RoundedRectangleBorder(
                 borderRadius:
-                    BorderRadius.circular(
-                  22,
-                ),
+                    BorderRadius.circular(22),
               ),
-              title:
-                  Row(
+              title: Row(
                 children: [
                   Container(
                     width: 42,
                     height: 42,
-                    decoration:
-                        BoxDecoration(
-                      color:
-                          accent.withValues(
+                    decoration: BoxDecoration(
+                      color: accent.withValues(
                         alpha: 0.10,
                       ),
                       borderRadius:
-                          BorderRadius.circular(
-                        12,
-                      ),
+                          BorderRadius.circular(12),
                     ),
-                    child:
-                        Icon(
-                      Icons
-                          .swap_horiz_rounded,
-                      color:
-                          accent,
+                    child: Icon(
+                      Icons.swap_horiz_rounded,
+                      color: accent,
                     ),
                   ),
-                  const SizedBox(
-                    width: 12,
-                  ),
+                  const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
                       'Virement entre mes comptes',
@@ -695,78 +591,76 @@ class _AccountsScreenState
                   ),
                 ],
               ),
-              content:
-                  SingleChildScrollView(
-                child:
-                    Column(
-                  mainAxisSize:
-                      MainAxisSize.min,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width:
-                          double.infinity,
+                      width: double.infinity,
                       padding:
-                          const EdgeInsets.all(
-                        13,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color:
-                            isDark
-                                ? const Color(
-                                    0xFF182236,
-                                  )
-                                : const Color(
-                                    0xFFF2F7FC,
-                                  ),
+                          const EdgeInsets.all(13),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF182236)
+                            : const Color(0xFFF2F7FC),
                         borderRadius:
-                            BorderRadius.circular(
-                          13,
-                        ),
+                            BorderRadius.circular(13),
                       ),
-                      child:
-                          Text(
+                      child: Text(
                         'Transférez de l’argent entre votre compte courant et votre compte épargne.',
-                        style:
-                            TextStyle(
-                          fontSize:
-                              12.5,
-                          color:
-                              isDark
-                                  ? Colors.white70
-                                  : const Color(
-                                      0xFF476579,
-                                    ),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF476579),
                         ),
                       ),
                     ),
-                    const SizedBox(
-                      height: 16,
-                    ),
+
+                    const SizedBox(height: 16),
+
+                    // =====================================================
+                    // CHOIX DU SENS
+                    // =====================================================
+
                     Row(
                       children: [
                         Expanded(
-                          child:
-                              ChoiceChip(
-                            label:
-                                const Text(
+                          child: ChoiceChip(
+                            label: Text(
                               'Courant → Épargne',
-                              style:
-                                  TextStyle(
-                                fontSize:
-                                    11,
+                              style: TextStyle(
+                                fontSize: 11,
                                 fontWeight:
                                     FontWeight.w600,
+                                color:
+                                    fromCourantToEpargne
+                                        ? Colors.white
+                                        : isDark
+                                            ? Colors.white70
+                                            : Colors.black87,
                               ),
                             ),
                             selected:
                                 fromCourantToEpargne,
-                            selectedColor:
-                                const Color(
-                                  0xFF087A5B,
-                                ).withValues(
-                              alpha:
-                                  0.16,
+                            selectedColor: green,
+                            backgroundColor:
+                                isDark
+                                    ? const Color(
+                                        0xFF182236,
+                                      )
+                                    : Colors.white,
+                            side: BorderSide(
+                              color:
+                                  fromCourantToEpargne
+                                      ? green
+                                      : Colors.grey.withValues(
+                                          alpha: 0.25,
+                                        ),
+                              width:
+                                  fromCourantToEpargne
+                                      ? 1.5
+                                      : 1.0,
                             ),
                             onSelected:
                                 isSubmitting
@@ -781,31 +675,46 @@ class _AccountsScreenState
                                       },
                           ),
                         ),
-                        const SizedBox(
-                          width: 8,
-                        ),
+
+                        const SizedBox(width: 8),
+
                         Expanded(
-                          child:
-                              ChoiceChip(
-                            label:
-                                const Text(
+                          child: ChoiceChip(
+                            label: Text(
                               'Épargne → Courant',
-                              style:
-                                  TextStyle(
-                                fontSize:
-                                    11,
+                              style: TextStyle(
+                                fontSize: 11,
                                 fontWeight:
                                     FontWeight.w600,
+                                color:
+                                    isSavingsToCurrent
+                                        ? green
+                                        : isDark
+                                            ? Colors.white70
+                                            : Colors.black87,
                               ),
                             ),
                             selected:
-                                !fromCourantToEpargne,
+                                isSavingsToCurrent,
                             selectedColor:
-                                const Color(
-                                  0xFF32B67A,
-                                ).withValues(
-                              alpha:
-                                  0.16,
+                                Colors.white,
+                            backgroundColor:
+                                isDark
+                                    ? const Color(
+                                        0xFF182236,
+                                      )
+                                    : Colors.white,
+                            side: BorderSide(
+                              color:
+                                  isSavingsToCurrent
+                                      ? green
+                                      : Colors.grey.withValues(
+                                          alpha: 0.25,
+                                        ),
+                              width:
+                                  isSavingsToCurrent
+                                      ? 1.5
+                                      : 1.0,
                             ),
                             onSelected:
                                 isSubmitting
@@ -822,12 +731,11 @@ class _AccountsScreenState
                         ),
                       ],
                     ),
-                    const SizedBox(
-                      height: 16,
-                    ),
+
+                    const SizedBox(height: 16),
+
                     _buildTransferAccountBox(
-                      title:
-                          'Compte source',
+                      title: 'Compte source',
                       accountName:
                           fromCourantToEpargne
                               ? 'Compte courant'
@@ -836,16 +744,13 @@ class _AccountsScreenState
                           fromCourantToEpargne
                               ? _courantAccountNumber!
                               : _epargneAccountNumber!,
-                      balance:
-                          sourceBalance,
-                      color:
-                          accent,
-                      isDark:
-                          isDark,
+                      balance: sourceBalance,
+                      color: accent,
+                      isDark: isDark,
                     ),
-                    const SizedBox(
-                      height: 10,
-                    ),
+
+                    const SizedBox(height: 10),
+
                     _buildTransferAccountBox(
                       title:
                           'Compte destination',
@@ -857,28 +762,24 @@ class _AccountsScreenState
                           fromCourantToEpargne
                               ? _epargneAccountNumber!
                               : _courantAccountNumber!,
-                      balance:
-                          destinationBalance,
+                      balance: destinationBalance,
                       color:
                           isDark
                               ? Colors.white54
                               : Colors.grey,
-                      isDark:
-                          isDark,
+                      isDark: isDark,
                     ),
-                    const SizedBox(
-                      height: 16,
-                    ),
+
+                    const SizedBox(height: 16),
+
                     TextField(
                       controller:
                           amountController,
                       enabled:
                           !isSubmitting,
                       keyboardType:
-                          const TextInputType
-                              .numberWithOptions(
-                        decimal:
-                            true,
+                          const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
                       decoration:
                           InputDecoration(
@@ -889,16 +790,14 @@ class _AccountsScreenState
                           Icons
                               .payments_outlined,
                         ),
-                        filled:
-                            true,
-                        fillColor:
-                            isDark
-                                ? const Color(
-                                    0xFF182236,
-                                  )
-                                : const Color(
-                                    0xFFF8FAFC,
-                                  ),
+                        filled: true,
+                        fillColor: isDark
+                            ? const Color(
+                                0xFF182236,
+                              )
+                            : const Color(
+                                0xFFF8FAFC,
+                              ),
                         border:
                             OutlineInputBorder(
                           borderRadius:
@@ -913,6 +812,11 @@ class _AccountsScreenState
                   ],
                 ),
               ),
+
+              // =========================================================
+              // ACTIONS
+              // =========================================================
+
               actions: [
                 TextButton(
                   onPressed:
@@ -928,6 +832,7 @@ class _AccountsScreenState
                     'Annuler',
                   ),
                 ),
+
                 ElevatedButton(
                   onPressed:
                       isSubmitting
@@ -944,15 +849,12 @@ class _AccountsScreenState
                                     ),
                               );
 
-                              if (amount ==
-                                      null ||
-                                  amount <=
-                                      0) {
+                              if (amount == null ||
+                                  amount <= 0) {
                                 ScaffoldMessenger
                                         .of(
-                                  context,
-                                )
-                                    .showSnackBar(
+                                  pageContext,
+                                ).showSnackBar(
                                   const SnackBar(
                                     content:
                                         Text(
@@ -969,9 +871,8 @@ class _AccountsScreenState
                                   sourceBalance) {
                                 ScaffoldMessenger
                                         .of(
-                                  context,
-                                )
-                                    .showSnackBar(
+                                  pageContext,
+                                ).showSnackBar(
                                   const SnackBar(
                                     content:
                                         Text(
@@ -984,14 +885,15 @@ class _AccountsScreenState
                                 return;
                               }
 
+                              final bool transferSavingsToCurrent =
+                                  !fromCourantToEpargne;
+
                               setDialogState(() {
-                                isSubmitting =
-                                    true;
+                                isSubmitting = true;
                               });
 
                               setState(() {
-                                _isTransferring =
-                                    true;
+                                _isTransferring = true;
                               });
 
                               try {
@@ -1004,8 +906,7 @@ class _AccountsScreenState
                                       fromCourantToEpargne
                                           ? _epargneAccountNumber!
                                           : _courantAccountNumber!,
-                                  amount:
-                                      amount,
+                                  amount: amount,
                                   label:
                                       fromCourantToEpargne
                                           ? 'Virement vers compte épargne'
@@ -1014,43 +915,29 @@ class _AccountsScreenState
 
                                 await _loadAccounts();
 
-                                if (!mounted)
+                                if (!mounted) {
                                   return;
+                                }
 
+                                // Fermer la fenêtre
+                                // de transfert.
                                 Navigator.pop(
                                   dialogContext,
                                 );
 
-                                ScaffoldMessenger
-                                        .of(
-                                  context,
-                                )
-                                    .showSnackBar(
-                                  SnackBar(
-                                    content:
-                                        Text(
-                                      'Virement de ${amount.toStringAsFixed(3)} TND effectué avec succès.',
-                                    ),
-                                    backgroundColor:
-                                        accent,
-                                    behavior:
-                                        SnackBarBehavior.floating,
-                                    margin:
-                                        const EdgeInsets.all(
-                                      16,
-                                    ),
-                                    shape:
-                                        RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                        12,
-                                      ),
-                                    ),
-                                  ),
+                                // =================================================
+                                // UNE VRAIE FENÊTRE DE CONFIRMATION
+                                // =================================================
+
+                                _showTransferConfirmationDialog(
+                                  savingsToCurrent:
+                                      transferSavingsToCurrent,
+                                  amount: amount,
                                 );
                               } catch (e) {
-                                if (!mounted)
+                                if (!mounted) {
                                   return;
+                                }
 
                                 setDialogState(() {
                                   isSubmitting =
@@ -1059,16 +946,20 @@ class _AccountsScreenState
 
                                 ScaffoldMessenger
                                         .of(
-                                  context,
-                                )
-                                    .showSnackBar(
+                                  pageContext,
+                                ).clearSnackBars();
+
+                                ScaffoldMessenger.of(
+                                  pageContext,
+                                ).showSnackBar(
                                   SnackBar(
                                     content:
                                         Text(
-                                      e.toString().replaceFirst(
-                                            'Exception: ',
-                                            '',
-                                          ),
+                                      e.toString()
+                                          .replaceFirst(
+                                        'Exception: ',
+                                        '',
+                                      ),
                                     ),
                                     backgroundColor:
                                         Colors.red,
@@ -1104,10 +995,8 @@ class _AccountsScreenState
                               height: 18,
                               child:
                                   CircularProgressIndicator(
-                                strokeWidth:
-                                    2,
-                                color:
-                                    Colors.white,
+                                strokeWidth: 2,
+                                color: Colors.white,
                               ),
                             )
                           : const Text(
@@ -1124,6 +1013,247 @@ class _AccountsScreenState
     );
   }
 
+  // =========================================================
+  // VRAIE FENÊTRE DE CONFIRMATION
+  // =========================================================
+
+  void _showTransferConfirmationDialog({
+    required bool savingsToCurrent,
+    required double amount,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        Future.delayed(
+  const Duration(seconds: 8),
+  () {
+    if (!dialogContext.mounted) return;
+
+    final navigator = Navigator.of(dialogContext);
+
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
+  },
+);
+
+        final Color backgroundColor =
+            savingsToCurrent
+                ? Colors.white
+                : green;
+
+        final Color foregroundColor =
+            savingsToCurrent
+                ? green
+                : Colors.white;
+
+        final Color secondaryColor =
+            savingsToCurrent
+                ? Colors.grey.shade600
+                : Colors.white.withValues(
+                    alpha: 0.78,
+                  );
+
+        final Color softBackground =
+            savingsToCurrent
+                ? const Color(0xFFEAF6F1)
+                : Colors.white.withValues(
+                    alpha: 0.13,
+                  );
+
+        return AlertDialog(
+          backgroundColor: backgroundColor,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: savingsToCurrent
+                ? const BorderSide(
+                    color: green,
+                    width: 1.5,
+                  )
+                : BorderSide.none,
+          ),
+          contentPadding:
+              const EdgeInsets.fromLTRB(
+            24,
+            28,
+            24,
+            24,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // =====================================================
+              // ICÔNE
+              // =====================================================
+
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: softBackground,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: foregroundColor,
+                  size: 54,
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // =====================================================
+              // TITRE
+              // =====================================================
+
+              Text(
+                'Virement effectué',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: foregroundColor,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // =====================================================
+              // MESSAGE
+              // =====================================================
+
+              Text(
+                savingsToCurrent
+                    ? 'Virement Épargne → Courant effectué avec succès.'
+                    : 'Virement Courant → Épargne effectué avec succès.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: secondaryColor,
+                  fontSize: 13,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // =====================================================
+              // MONTANT
+              // =====================================================
+
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 17,
+                ),
+                decoration: BoxDecoration(
+                  color: savingsToCurrent
+                      ? const Color(0xFFF6FAF8)
+                      : Colors.white.withValues(
+                          alpha: 0.11,
+                        ),
+                  borderRadius:
+                      BorderRadius.circular(16),
+                  border: savingsToCurrent
+                      ? Border.all(
+                          color: green.withValues(
+                            alpha: 0.12,
+                          ),
+                        )
+                      : null,
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Montant transféré',
+                      style: TextStyle(
+                        color: secondaryColor,
+                        fontSize: 11.5,
+                        fontWeight:
+                            FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${amount.toStringAsFixed(3)} TND',
+                      style: TextStyle(
+                        color: foregroundColor,
+                        fontSize: 27,
+                        fontWeight:
+                            FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // =====================================================
+              // SENS DU VIREMENT
+              // =====================================================
+
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: softBackground,
+                  borderRadius:
+                      BorderRadius.circular(30),
+                  border: savingsToCurrent
+                      ? Border.all(
+                          color: green.withValues(
+                            alpha: 0.20,
+                          ),
+                        )
+                      : null,
+                ),
+                child: Text(
+                  savingsToCurrent
+                      ? 'ÉPARGNE → COURANT'
+                      : 'COURANT → ÉPARGNE',
+                  style: TextStyle(
+                    color: foregroundColor,
+                    fontSize: 10.5,
+                    fontWeight:
+                        FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // =====================================================
+              // INFORMATION 8 SECONDES
+              // =====================================================
+
+              Text(
+                'Cette confirmation disparaîtra automatiquement.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: secondaryColor,
+                  fontSize: 10.5,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================================================
+  // BOX COMPTE TRANSFERT
+  // =========================================================
+
   Widget _buildTransferAccountBox({
     required String title,
     required String accountName,
@@ -1134,18 +1264,14 @@ class _AccountsScreenState
   }) {
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.all(13),
-      decoration:
-          BoxDecoration(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
         color: isDark
             ? const Color(0xFF182236)
             : const Color(0xFFF8FAFC),
-        borderRadius:
-            BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color:
-              color.withValues(
+          color: color.withValues(
             alpha: 0.15,
           ),
         ),
@@ -1156,9 +1282,7 @@ class _AccountsScreenState
             Icons.account_balance_wallet_outlined,
             color: color,
           ),
-          const SizedBox(
-            width: 10,
-          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -1166,51 +1290,36 @@ class _AccountsScreenState
               children: [
                 Text(
                   title,
-                  style:
-                      TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color:
-                        isDark
-                            ? Colors.white54
-                            : Colors.grey.shade600,
+                    color: isDark
+                        ? Colors.white54
+                        : Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(
-                  height: 3,
-                ),
+                const SizedBox(height: 3),
                 Text(
                   accountName,
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.w700,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(
-                  height: 2,
-                ),
+                const SizedBox(height: 2),
                 Text(
                   accountNumber,
-                  style:
-                      TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color:
-                        isDark
-                            ? Colors.white54
-                            : Colors.grey.shade600,
+                    color: isDark
+                        ? Colors.white54
+                        : Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(
-                  height: 3,
-                ),
+                const SizedBox(height: 3),
                 Text(
                   'Solde : ${balance.toStringAsFixed(3)} TND',
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.w600,
-                    fontSize:
-                        12,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -1226,42 +1335,30 @@ class _AccountsScreenState
   // =========================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     final isDark =
-        theme.brightness ==
-            Brightness.dark;
+        theme.brightness == Brightness.dark;
 
-    final currentAccount =
-        Account(
+    final currentAccount = Account(
       id: 1,
       accountNumber:
           _courantAccountNumber ??
               'Chargement...',
-      accountType:
-          'Compte courant',
-      balance:
-          _courant,
-      currency:
-          'TND',
+      accountType: 'Compte courant',
+      balance: _courant,
+      currency: 'TND',
     );
 
-    final savingsAccount =
-        Account(
+    final savingsAccount = Account(
       id: 2,
       accountNumber:
           _epargneAccountNumber ??
               'Chargement...',
-      accountType:
-          'Compte épargne',
-      balance:
-          _epargne,
-      currency:
-          'TND',
+      accountType: 'Compte épargne',
+      balance: _epargne,
+      currency: 'TND',
     );
 
     final annualInterest =
@@ -1291,8 +1388,7 @@ class _AccountsScreenState
         ),
         actions: [
           IconButton(
-            tooltip:
-                'Actualiser',
+            tooltip: 'Actualiser',
             onPressed:
                 _isLoading ||
                         _isTransferring
@@ -1303,9 +1399,7 @@ class _AccountsScreenState
               Icons.refresh_rounded,
             ),
           ),
-          const SizedBox(
-            width: 6,
-          ),
+          const SizedBox(width: 6),
         ],
       ),
       body:
@@ -1343,17 +1437,14 @@ class _AccountsScreenState
                                 FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(
-                          height: 6,
-                        ),
+                        const SizedBox(height: 6),
                         Text(
                           'Consultez vos soldes, vos comptes et votre épargne.',
                           style:
                               theme.textTheme.bodyMedium?.copyWith(
                             color:
                                 theme.textTheme.bodyMedium?.color?.withValues(
-                              alpha:
-                                  0.68,
+                              alpha: 0.68,
                             ),
                           ),
                         ),

@@ -20,7 +20,7 @@ public class CardController {
     }
 
     // =========================================================
-    // RÉCUPÉRER LES CARTES D'UN UTILISATEUR
+    // CARTES D'UN UTILISATEUR
     // =========================================================
 
     @GetMapping("/user/{userId}")
@@ -28,31 +28,19 @@ public class CardController {
             @PathVariable Long userId) {
 
         try {
-
             List<Card> cards =
                     cardService.getCardsByUser(userId);
 
             List<Map<String, Object>> response =
                     cards.stream()
                             .map(card -> Map.<String, Object>of(
-                                    "id",
-                                    card.getId(),
-
-                                    "cardType",
-                                    card.getCardType(),
-
-                                    "lastFourDigits",
-                                    card.getLastFourDigits(),
-
-                                    "expiryDate",
-                                    card.getExpiryDate(),
-
-                                    "status",
-                                    card.getStatus(),
-
+                                    "id", card.getId(),
+                                    "cardType", card.getCardType(),
+                                    "lastFourDigits", card.getLastFourDigits(),
+                                    "expiryDate", card.getExpiryDate(),
+                                    "status", card.getStatus(),
                                     "accountNumber",
-                                    card.getAccount()
-                                            .getAccountNumber()
+                                    card.getAccount().getAccountNumber()
                             ))
                             .toList();
 
@@ -70,10 +58,9 @@ public class CardController {
     }
 
     // =========================================================
-    // AJOUTER UNE CARTE AVEC INFORMATIONS FOURNIES
-    // =========================================================
-    //
-    // Conservé pour ne pas casser l'existant.
+    // AJOUT MANUEL D'UNE CARTE
+    // Conservé pour ne pas supprimer une fonctionnalité existante.
+    // L'interface Flutter ne propose plus "Ajouter une carte".
     // =========================================================
 
     @PostMapping
@@ -82,9 +69,34 @@ public class CardController {
 
         try {
 
-            Long userId = Long.valueOf(
-                    request.get("userId").toString()
-            );
+            if (request.get("userId") == null) {
+                throw new RuntimeException(
+                        "Utilisateur obligatoire."
+                );
+            }
+
+            if (request.get("cardType") == null) {
+                throw new RuntimeException(
+                        "Le type de carte est obligatoire."
+                );
+            }
+
+            if (request.get("lastFourDigits") == null) {
+                throw new RuntimeException(
+                        "Les quatre derniers chiffres sont obligatoires."
+                );
+            }
+
+            if (request.get("expiryDate") == null) {
+                throw new RuntimeException(
+                        "La date d'expiration est obligatoire."
+                );
+            }
+
+            Long userId =
+                    Long.valueOf(
+                            request.get("userId").toString()
+                    );
 
             String cardType =
                     request.get("cardType").toString();
@@ -95,36 +107,30 @@ public class CardController {
             String expiryDate =
                     request.get("expiryDate").toString();
 
-            Card card = cardService.addCard(
-                    userId,
-                    cardType,
-                    lastFourDigits,
-                    expiryDate
-            );
+            Card card =
+                    cardService.addCard(
+                            userId,
+                            cardType,
+                            lastFourDigits,
+                            expiryDate
+                    );
 
             return ResponseEntity.ok(
                     Map.of(
                             "message",
                             "Carte ajoutée avec succès.",
-
                             "id",
                             card.getId(),
-
                             "cardType",
                             card.getCardType(),
-
                             "lastFourDigits",
                             card.getLastFourDigits(),
-
                             "expiryDate",
                             card.getExpiryDate(),
-
                             "status",
                             card.getStatus(),
-
                             "accountNumber",
-                            card.getAccount()
-                                    .getAccountNumber()
+                            card.getAccount().getAccountNumber()
                     )
             );
 
@@ -140,19 +146,8 @@ public class CardController {
     }
 
     // =========================================================
-    // ATTRIBUER UNE NOUVELLE CARTE
-    // =========================================================
-    //
-    // La banque fournit :
-    // - userId
-    // - cardType
-    //
-    // Le backend génère automatiquement :
-    // - les 4 derniers chiffres
-    // - la date d'expiration
-    // - ACTIVE
-    //
-    // L'ancienne carte reste inchangée.
+    // ATTRIBUTION D'UNE CARTE
+    // API conservée pour le futur espace bancaire.
     // =========================================================
 
     @PostMapping("/assign")
@@ -173,41 +168,109 @@ public class CardController {
                 );
             }
 
-            Long userId = Long.valueOf(
-                    request.get("userId").toString()
-            );
+            Long userId =
+                    Long.valueOf(
+                            request.get("userId").toString()
+                    );
 
             String cardType =
                     request.get("cardType").toString();
 
-            Card card = cardService.assignCard(
-                    userId,
-                    cardType
-            );
+            Card card =
+                    cardService.assignCard(
+                            userId,
+                            cardType
+                    );
 
             return ResponseEntity.ok(
                     Map.of(
                             "message",
                             "Carte attribuée avec succès.",
-
                             "id",
                             card.getId(),
-
                             "cardType",
                             card.getCardType(),
-
                             "lastFourDigits",
                             card.getLastFourDigits(),
-
                             "expiryDate",
                             card.getExpiryDate(),
-
                             "status",
                             card.getStatus(),
-
                             "accountNumber",
-                            card.getAccount()
-                                    .getAccountNumber()
+                            card.getAccount().getAccountNumber()
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(Map.of(
+                            "message",
+                            e.getMessage()
+                    ));
+        }
+    }
+
+    // =========================================================
+    // ATTRIBUTION DEPUIS L'ESPACE BANCAIRE
+    //
+    // IMPORTANT :
+    // Pour l'instant l'endpoint existe mais n'est PAS encore
+    // sécurisé par Spring Security.
+    //
+    // Nous ajouterons la vraie protection ADMIN après avoir
+    // vérifié le système de connexion/authentification actuel.
+    // =========================================================
+
+    @PostMapping("/admin/assign")
+    public ResponseEntity<?> adminAssignCard(
+            @RequestBody Map<String, Object> request) {
+
+        try {
+
+            if (request.get("userId") == null) {
+                throw new RuntimeException(
+                        "Utilisateur obligatoire."
+                );
+            }
+
+            if (request.get("cardType") == null) {
+                throw new RuntimeException(
+                        "Le type de carte est obligatoire."
+                );
+            }
+
+            Long userId =
+                    Long.valueOf(
+                            request.get("userId").toString()
+                    );
+
+            String cardType =
+                    request.get("cardType").toString();
+
+            Card card =
+                    cardService.assignCard(
+                            userId,
+                            cardType
+                    );
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Carte attribuée avec succès depuis l'espace bancaire.",
+                            "id",
+                            card.getId(),
+                            "cardType",
+                            card.getCardType(),
+                            "lastFourDigits",
+                            card.getLastFourDigits(),
+                            "expiryDate",
+                            card.getExpiryDate(),
+                            "status",
+                            card.getStatus(),
+                            "accountNumber",
+                            card.getAccount().getAccountNumber()
                     )
             );
 
@@ -233,13 +296,27 @@ public class CardController {
 
         try {
 
-            Long userId = Long.valueOf(
-                    request.get("userId").toString()
-            );
+            if (request.get("userId") == null) {
+                throw new RuntimeException(
+                        "Utilisateur obligatoire."
+                );
+            }
 
-            BigDecimal amount = new BigDecimal(
-                    request.get("amount").toString()
-            );
+            if (request.get("amount") == null) {
+                throw new RuntimeException(
+                        "Montant obligatoire."
+                );
+            }
+
+            Long userId =
+                    Long.valueOf(
+                            request.get("userId").toString()
+                    );
+
+            BigDecimal amount =
+                    new BigDecimal(
+                            request.get("amount").toString()
+                    );
 
             BigDecimal newBalance =
                     cardService.withdrawWithCard(
@@ -252,10 +329,8 @@ public class CardController {
                     Map.of(
                             "message",
                             "Retrait effectué avec succès.",
-
                             "amount",
                             amount,
-
                             "newBalance",
                             newBalance
                     )
@@ -283,23 +358,29 @@ public class CardController {
 
         try {
 
-            Long userId = Long.valueOf(
-                    request.get("userId").toString()
-            );
+            if (request.get("userId") == null) {
+                throw new RuntimeException(
+                        "Utilisateur obligatoire."
+                );
+            }
 
-            Card card = cardService.blockCard(
-                    userId,
-                    cardId
-            );
+            Long userId =
+                    Long.valueOf(
+                            request.get("userId").toString()
+                    );
+
+            Card card =
+                    cardService.blockCard(
+                            userId,
+                            cardId
+                    );
 
             return ResponseEntity.ok(
                     Map.of(
                             "message",
                             "Carte bloquée avec succès.",
-
                             "id",
                             card.getId(),
-
                             "status",
                             card.getStatus()
                     )
@@ -327,23 +408,29 @@ public class CardController {
 
         try {
 
-            Long userId = Long.valueOf(
-                    request.get("userId").toString()
-            );
+            if (request.get("userId") == null) {
+                throw new RuntimeException(
+                        "Utilisateur obligatoire."
+                );
+            }
 
-            Card card = cardService.unblockCard(
-                    userId,
-                    cardId
-            );
+            Long userId =
+                    Long.valueOf(
+                            request.get("userId").toString()
+                    );
+
+            Card card =
+                    cardService.unblockCard(
+                            userId,
+                            cardId
+                    );
 
             return ResponseEntity.ok(
                     Map.of(
                             "message",
                             "Carte débloquée avec succès.",
-
                             "id",
                             card.getId(),
-
                             "status",
                             card.getStatus()
                     )

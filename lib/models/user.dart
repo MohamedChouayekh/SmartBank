@@ -6,6 +6,7 @@ class User {
   final String phone;
   final String username;
   final String address;
+  final String role;
 
   User({
     required this.id,
@@ -15,6 +16,7 @@ class User {
     required this.phone,
     required this.username,
     required this.address,
+    this.role = 'CLIENT',
   });
 
   String get fullName => '$firstName $lastName';
@@ -41,8 +43,7 @@ class User {
           ? (json['id'] as num).toInt()
           : int.tryParse(
                 (json['id'] ?? '0').toString(),
-              ) ??
-              0,
+              ) ?? 0,
 
       firstName: firstName,
 
@@ -55,6 +56,8 @@ class User {
       username: (json['username'] ?? '').toString(),
 
       address: (json['address'] ?? '').toString(),
+
+      role: (json['role'] ?? 'CLIENT').toString().trim().toUpperCase(),
     );
   }
 }

@@ -33,8 +33,7 @@ class MainNavigation extends StatefulWidget {
   });
 
   @override
-  State<MainNavigation> createState() =>
-      _MainNavigationState();
+  State<MainNavigation> createState() => _MainNavigationState();
 }
 
 class _MainNavigationState extends State<MainNavigation>
@@ -294,7 +293,7 @@ class _MainNavigationState extends State<MainNavigation>
   }
 
   // =========================================================
-  // CHARGER LE DERNIER VIREMENT NON LU
+  // CHARGER LE DERNIER VIREMENT
   // =========================================================
 
   Future<void> _loadLatestTransferNotification({
@@ -347,8 +346,7 @@ class _MainNavigationState extends State<MainNavigation>
       (a, b) {
         final aDate =
             DateTime.tryParse(
-                  (a['createdAt'] ??
-                          '')
+                  (a['createdAt'] ?? '')
                       .toString(),
                 ) ??
                 DateTime.fromMillisecondsSinceEpoch(
@@ -357,8 +355,7 @@ class _MainNavigationState extends State<MainNavigation>
 
         final bDate =
             DateTime.tryParse(
-                  (b['createdAt'] ??
-                          '')
+                  (b['createdAt'] ?? '')
                       .toString(),
                 ) ??
                 DateTime.fromMillisecondsSinceEpoch(
@@ -372,7 +369,21 @@ class _MainNavigationState extends State<MainNavigation>
     );
 
     // =======================================================
-    // CHERCHER LE DERNIER TRANSFERT NON LU
+    // CHERCHER LE DERNIER VIREMENT À AFFICHER
+    //
+    // On accepte :
+    //
+    // 1. TRANSFER_IN
+    // 2. TRANSFER + "Virement reçu"
+    // 3. TRANSFER + transfert interne
+    //
+    // On ignore :
+    //
+    // 1. TRANSFER_OUT
+    // 2. TRANSFER + "Virement envoyé"
+    //
+    // Cela permet de gérer les anciennes notifications qui
+    // utilisent encore type = TRANSFER.
     // =======================================================
 
     Map<String, dynamic>?
@@ -381,26 +392,67 @@ class _MainNavigationState extends State<MainNavigation>
     for (final notification
         in notifications) {
       final type =
-          (notification['type'] ??
-                  '')
+          (notification['type'] ?? '')
               .toString()
               .trim()
               .toUpperCase();
 
-      final normalizedType =
-          _normalizeNotificationType(
-        type,
-      );
+      // =====================================================
+      // TRANSFERT SORTANT MODERNE
+      // =====================================================
 
-      final isUnread =
-          notification['read'] != true;
+      if (type == 'TRANSFER_OUT') {
+        continue;
+      }
 
-      if (normalizedType ==
-              'TRANSFER' &&
-          isUnread) {
+      // =====================================================
+      // TRANSFERT ENTRANT MODERNE
+      // =====================================================
+
+      if (type == 'TRANSFER_IN') {
         latestTransfer =
             notification;
         break;
+      }
+
+      // =====================================================
+      // ANCIEN FORMAT TRANSFER
+      // =====================================================
+
+      if (type == 'TRANSFER') {
+        // -----------------------------------------------
+        // Virement reçu
+        // -----------------------------------------------
+
+        if (_isIncomingTransfer(
+          notification,
+        )) {
+          latestTransfer =
+              notification;
+          break;
+        }
+
+        // -----------------------------------------------
+        // Transfert entre ses propres comptes
+        // -----------------------------------------------
+
+        if (_isInternalTransfer(
+          notification,
+        )) {
+          latestTransfer =
+              notification;
+          break;
+        }
+
+        // -----------------------------------------------
+        // Virement envoyé
+        // -----------------------------------------------
+
+        if (_isOutgoingTransfer(
+          notification,
+        )) {
+          continue;
+        }
       }
     }
 
@@ -415,19 +467,21 @@ class _MainNavigationState extends State<MainNavigation>
 
     final notificationId =
         int.tryParse(
-      (latestTransfer['id'] ??
-              '')
+      (latestTransfer['id'] ?? '')
           .toString(),
     );
 
     if (notificationId ==
         null) {
+      debugPrint(
+        '[NOTIFICATIONS] ⚠️ Notification sans ID valide.',
+      );
+
       return;
     }
 
     final originalType =
-        (latestTransfer['type'] ??
-                '')
+        (latestTransfer['type'] ?? '')
             .toString()
             .trim()
             .toUpperCase();
@@ -436,13 +490,35 @@ class _MainNavigationState extends State<MainNavigation>
         latestTransfer['read'] !=
             true;
 
+    debugPrint(
+      '[NOTIFICATIONS] '
+      'Dernier transfert détecté : '
+      'id=$notificationId '
+      'type=$originalType '
+      'title=${latestTransfer['title']} '
+      'read=${latestTransfer['read']} '
+      'amount=${latestTransfer['amount']}',
+    );
+
     // =======================================================
     // PREMIER CHARGEMENT
+    //
+    // On mémorise la dernière notification existante
+    // pour éviter d'afficher une ancienne notification.
+    //
+    // Si elle est encore non lue, elle peut être affichée.
     // =======================================================
 
     if (initializeOnly) {
       _lastDisplayedNotificationId =
           notificationId;
+
+      debugPrint(
+        '[NOTIFICATIONS] '
+        'Initialisation : '
+        'id=$notificationId '
+        'unread=$isUnread',
+      );
 
       final allowed =
           await _isNotificationAllowed(
@@ -472,7 +548,23 @@ class _MainNavigationState extends State<MainNavigation>
 
     // =======================================================
     // NOUVELLE NOTIFICATION
+    //
+    // IMPORTANT :
+    // On ne vérifie PAS read == false ici.
+    //
+    // L'ID permet de détecter une nouvelle notification même
+    // si elle a déjà été marquée comme lue.
     // =======================================================
+
+    debugPrint(
+      '[NOTIFICATIONS] '
+      '🆕 Nouvelle notification détectée : '
+      'id=$notificationId '
+      'type=$originalType '
+      'title=${latestTransfer['title']} '
+      'read=${latestTransfer['read']} '
+      'amount=${latestTransfer['amount']}',
+    );
 
     _lastDisplayedNotificationId =
         notificationId;
@@ -484,12 +576,155 @@ class _MainNavigationState extends State<MainNavigation>
 
     if (!allowed ||
         !mounted) {
+      debugPrint(
+        '[NOTIFICATIONS] '
+        '🚫 Notification bloquée par les préférences.',
+      );
+
       return;
     }
 
     _showNotificationBanner(
       latestTransfer,
     );
+  }
+
+  // =========================================================
+  // DÉTECTER VIREMENT ENTRANT
+  //
+  // Compatible avec :
+  //
+  // TRANSFER_IN
+  //
+  // et ancien format :
+  //
+  // TRANSFER + Virement reçu
+  // =========================================================
+
+  bool _isIncomingTransfer(
+    Map<String, dynamic>
+        notification,
+  ) {
+    final type =
+        (notification['type'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
+
+    if (type == 'TRANSFER_IN') {
+      return true;
+    }
+
+    if (type != 'TRANSFER') {
+      return false;
+    }
+
+    if (_isInternalTransfer(
+      notification,
+    )) {
+      return false;
+    }
+
+    final title =
+        (notification['title'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+
+    final message =
+        (notification['message'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+
+    if (title.contains(
+          'virement reçu',
+        ) ||
+        title.contains(
+          'transfert reçu',
+        )) {
+      return true;
+    }
+
+    if (message.contains(
+          'vous avez reçu',
+        ) &&
+        message.contains(
+          'tnd',
+        )) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // =========================================================
+  // DÉTECTER VIREMENT SORTANT
+  //
+  // Compatible avec :
+  //
+  // TRANSFER_OUT
+  //
+  // et ancien format :
+  //
+  // TRANSFER + Virement envoyé
+  // =========================================================
+
+  bool _isOutgoingTransfer(
+    Map<String, dynamic>
+        notification,
+  ) {
+    final type =
+        (notification['type'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
+
+    if (type == 'TRANSFER_OUT') {
+      return true;
+    }
+
+    if (type != 'TRANSFER') {
+      return false;
+    }
+
+    if (_isInternalTransfer(
+      notification,
+    )) {
+      return false;
+    }
+
+    final title =
+        (notification['title'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+
+    final message =
+        (notification['message'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+
+    if (title.contains(
+          'virement envoyé',
+        ) ||
+        title.contains(
+          'transfert envoyé',
+        )) {
+      return true;
+    }
+
+    if (message.contains(
+          'vous avez envoyé',
+        ) &&
+        message.contains(
+          'tnd',
+        )) {
+      return true;
+    }
+
+    return false;
   }
 
   // =========================================================
@@ -511,7 +746,9 @@ class _MainNavigationState extends State<MainNavigation>
       }
 
       final decoded =
-          _apiService.decodeResponse(response);
+          _apiService.decodeResponse(
+        response,
+      );
 
       if (decoded is! Map) {
         return true;
@@ -630,8 +867,7 @@ class _MainNavigationState extends State<MainNavigation>
         notification,
   ) {
     final title =
-        (notification['title'] ??
-                '')
+        (notification['title'] ?? '')
             .toString()
             .toLowerCase();
 
@@ -702,8 +938,7 @@ class _MainNavigationState extends State<MainNavigation>
     } else {
       amount =
           double.tryParse(
-                value?.toString() ??
-                    '',
+                value?.toString() ?? '',
               ) ??
               0.0;
     }
@@ -732,8 +967,7 @@ class _MainNavigationState extends State<MainNavigation>
       return '';
     }
 
-    if (clean.contains(
-        '••••')) {
+    if (clean.contains('••••')) {
       return clean;
     }
 
@@ -770,8 +1004,7 @@ class _MainNavigationState extends State<MainNavigation>
 
       final amount =
           _formatAmount(
-        notification[
-            'amount'],
+        notification['amount'],
       );
 
       return 'Vous effectuez un virement de '
@@ -783,9 +1016,7 @@ class _MainNavigationState extends State<MainNavigation>
     // =======================================================
 
     final senderName =
-        (notification[
-                    'senderName'] ??
-                '')
+        (notification['senderName'] ?? '')
             .toString()
             .trim();
 
@@ -797,36 +1028,100 @@ class _MainNavigationState extends State<MainNavigation>
 
     final amount =
         _formatAmount(
-      notification[
-          'amount'],
+      notification['amount'],
     );
 
-    if (senderName.isNotEmpty &&
-        senderAccount.isNotEmpty) {
-      return 'Virement reçu de '
-          '$senderName • $senderAccount • $amount';
+    final notificationType =
+        (notification['type'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
+
+    final isIncoming =
+        _isIncomingTransfer(
+      notification,
+    );
+
+    final isOutgoing =
+        _isOutgoingTransfer(
+      notification,
+    );
+
+    // =======================================================
+    // TRANSFERT SORTANT
+    // =======================================================
+
+    if (isOutgoing) {
+      final recipientAccount =
+          (notification[
+                      'recipientAccountNumber'] ??
+                  notification[
+                      'destinationAccountNumber'] ??
+                  notification[
+                      'relatedAccountNumber'] ??
+                  '')
+              .toString()
+              .trim();
+
+      if (recipientAccount
+          .isNotEmpty) {
+        return 'Virement envoyé vers '
+            '$recipientAccount • $amount';
+      }
+
+      final outgoingMessage =
+          (notification['message'] ?? '')
+              .toString()
+              .trim();
+
+      return outgoingMessage.isNotEmpty
+          ? outgoingMessage
+          : 'Montant envoyé : $amount';
     }
 
-    if (senderName.isNotEmpty) {
-      return 'Virement reçu de '
-          '$senderName • $amount';
+    // =======================================================
+    // TRANSFERT ENTRANT
+    // =======================================================
+
+    if (isIncoming) {
+      if (senderName.isNotEmpty &&
+          senderAccount.isNotEmpty) {
+        return 'Virement reçu de '
+            '$senderName • $senderAccount • $amount';
+      }
+
+      if (senderName.isNotEmpty) {
+        return 'Virement reçu de '
+            '$senderName • $amount';
+      }
+
+      if (senderAccount.isNotEmpty) {
+        return 'Virement reçu • '
+            '$senderAccount • $amount';
+      }
+
+      final incomingMessage =
+          (notification['message'] ?? '')
+              .toString()
+              .trim();
+
+      return incomingMessage.isNotEmpty
+          ? incomingMessage
+          : 'Montant reçu : $amount';
     }
 
-    if (senderAccount.isNotEmpty) {
-      return 'Virement reçu • '
-          '$senderAccount • $amount';
-    }
+    // =======================================================
+    // COMPATIBILITÉ
+    // =======================================================
 
     final message =
-        (notification[
-                    'message'] ??
-                '')
+        (notification['message'] ?? '')
             .toString()
             .trim();
 
     return message.isNotEmpty
         ? message
-        : 'Vous avez reçu un virement.';
+        : 'Virement effectué.';
   }
 
   // =========================================================
@@ -868,7 +1163,6 @@ class _MainNavigationState extends State<MainNavigation>
 
     // ---------------------------------------------
     // COURANT → ÉPARGNE
-    // VERT FONCÉ
     // ---------------------------------------------
 
     if (sourceType ==
@@ -880,7 +1174,6 @@ class _MainNavigationState extends State<MainNavigation>
 
     // ---------------------------------------------
     // ÉPARGNE → COURANT
-    // VERT CLAIR
     // ---------------------------------------------
 
     if (sourceType ==
@@ -932,7 +1225,6 @@ class _MainNavigationState extends State<MainNavigation>
 
     // ---------------------------------------------
     // COURANT → ÉPARGNE
-    // VERT FONCÉ
     // ---------------------------------------------
 
     if (sourceType ==
@@ -944,7 +1236,6 @@ class _MainNavigationState extends State<MainNavigation>
 
     // ---------------------------------------------
     // ÉPARGNE → COURANT
-    // VERT CLAIR
     // ---------------------------------------------
 
     if (sourceType ==
@@ -967,10 +1258,67 @@ class _MainNavigationState extends State<MainNavigation>
   ) {
     if (!mounted) return;
 
+    // =======================================================
+    // PROTECTION ABSOLUE
+    // =======================================================
+
+    final notificationType =
+        (notification['type'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
+
+    final internal =
+        _isInternalTransfer(
+      notification,
+    );
+
+    final incoming =
+        _isIncomingTransfer(
+      notification,
+    );
+
+    final outgoing =
+        _isOutgoingTransfer(
+      notification,
+    );
+
+    // =======================================================
+    // TRANSFERT SORTANT
+    // =======================================================
+
+    if (outgoing) {
+      debugPrint(
+        '[NOTIFICATIONS] 🚫 Bandeau ignoré : '
+        'virement sortant '
+        'type=$notificationType',
+      );
+
+      return;
+    }
+
+    // =======================================================
+    // AUTORISER UNIQUEMENT :
+    //
+    // - TRANSFER_IN
+    // - ancien TRANSFER reçu
+    // - transfert interne
+    // =======================================================
+
+    if (!incoming &&
+        !internal) {
+      debugPrint(
+        '[NOTIFICATIONS] 🚫 Bandeau ignoré : '
+        'type=$notificationType '
+        'title=${notification['title']}',
+      );
+
+      return;
+    }
+
     final id =
         int.tryParse(
-      (notification['id'] ??
-              '')
+      (notification['id'] ?? '')
           .toString(),
     );
 
@@ -1069,7 +1417,12 @@ class _MainNavigationState extends State<MainNavigation>
     );
 
     debugPrint(
-      '[NOTIFICATIONS] ✅ Bandeau affiché id=$id',
+      '[NOTIFICATIONS] ✅ Bandeau affiché '
+      'id=$id '
+      'type=$notificationType '
+      'incoming=$incoming '
+      'internal=$internal '
+      'amount=${notification['amount']}',
     );
   }
 
@@ -1300,8 +1653,11 @@ class _MainNavigationState extends State<MainNavigation>
       // =====================================================
 
       CardsScreen(
-        firstName:
-            widget.user.firstName,
+        userId: widget.user.id,
+        firstName: widget.user.firstName,
+        courantBalance: _courantBalance,
+        onCourantBalanceChanged:
+            _updateCourantBalance,
       ),
 
       // =====================================================
@@ -1491,24 +1847,72 @@ class _MainNavigationState extends State<MainNavigation>
     }
 
     // =======================================================
-    // DÉTECTION
+    // PROTECTION SUPPLÉMENTAIRE
     // =======================================================
+
+    final notificationType =
+        (notification['type'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
 
     final internal =
         _isInternalTransfer(
       notification,
     );
 
+    final incoming =
+        _isIncomingTransfer(
+      notification,
+    );
+
+    final outgoing =
+        _isOutgoingTransfer(
+      notification,
+    );
+
+    // =======================================================
+    // SORTANT : JAMAIS DE BANDEAU
+    // =======================================================
+
+    if (outgoing) {
+      return const SizedBox
+          .shrink();
+    }
+
+    // =======================================================
+    // SEULS LES ENTRANTS ET INTERNES SONT AUTORISÉS
+    // =======================================================
+
+    if (!incoming &&
+        !internal) {
+      return const SizedBox
+          .shrink();
+    }
+
+    // =======================================================
+    // DÉTECTION
+    // =======================================================
+
+    final isIncoming =
+        incoming;
+
+    final isOutgoing =
+        outgoing;
+
     // =======================================================
     // TITRE
     // =======================================================
 
     final title =
-        (notification[
-                    'title'] ??
+        (notification['title'] ??
                 (internal
                     ? 'Transfert entre vos comptes'
-                    : 'Virement reçu'))
+                    : isIncoming
+                        ? 'Virement reçu'
+                        : isOutgoing
+                            ? 'Virement envoyé'
+                            : 'Virement'))
             .toString();
 
     // =======================================================
@@ -1526,14 +1930,11 @@ class _MainNavigationState extends State<MainNavigation>
 
     final amount =
         _formatAmount(
-      notification[
-          'amount'],
+      notification['amount'],
     );
 
     final senderName =
-        (notification[
-                    'senderName'] ??
-                '')
+        (notification['senderName'] ?? '')
             .toString()
             .trim();
 
@@ -1557,7 +1958,6 @@ class _MainNavigationState extends State<MainNavigation>
 
     // =======================================================
     // COULEURS
-    // UNE SEULE FENÊTRE
     // =======================================================
 
     final bannerPrimary =
@@ -1668,7 +2068,7 @@ class _MainNavigationState extends State<MainNavigation>
 
             children: [
               // =================================================
-              // CONTENU DE LA SEULE FENÊTRE
+              // CONTENU
               // =================================================
 
               Padding(
@@ -1858,7 +2258,7 @@ class _MainNavigationState extends State<MainNavigation>
                                         0.82,
                                   ),
                                   fontSize:
-                                      11.5,
+                                    11.5,
                                 ),
                               ),
                             ),
@@ -1875,7 +2275,9 @@ class _MainNavigationState extends State<MainNavigation>
                           Text(
                             internal
                                 ? message
-                                : 'Montant reçu : $amount',
+                                : isOutgoing
+                                    ? 'Montant envoyé : $amount'
+                                    : 'Montant reçu : $amount',
                             maxLines:
                                 3,
                             overflow:
@@ -1895,9 +2297,7 @@ class _MainNavigationState extends State<MainNavigation>
                           ),
 
                           // ==================================
-                          // TRANSFERT INTERNE :
-                          // COURANT → ÉPARGNE
-                          // ÉPARGNE → COURANT
+                          // TRANSFERT INTERNE
                           // ==================================
 
                           if (internal)
@@ -1930,22 +2330,22 @@ class _MainNavigationState extends State<MainNavigation>
                                 ),
                                 child:
                                     Text(
-                                  '${sourceType.toUpperCase()}  →  ${destinationType.toUpperCase()}',
-                                  style:
-                                      TextStyle(
-                                    color:
-                                        Colors.white.withValues(
-                                      alpha:
-                                          0.90,
+                                      '${sourceType.toUpperCase()}  →  ${destinationType.toUpperCase()}',
+                                      style:
+                                          TextStyle(
+                                        color:
+                                            Colors.white.withValues(
+                                          alpha:
+                                              0.90,
+                                        ),
+                                        fontSize:
+                                            9.5,
+                                        fontWeight:
+                                            FontWeight.w800,
+                                        letterSpacing:
+                                            0.25,
+                                      ),
                                     ),
-                                    fontSize:
-                                        9.5,
-                                    fontWeight:
-                                        FontWeight.w800,
-                                    letterSpacing:
-                                        0.25,
-                                  ),
-                                ),
                               ),
                             ),
                         ],
@@ -1985,15 +2385,15 @@ class _MainNavigationState extends State<MainNavigation>
                             _hideNotificationBanner,
                         icon:
                             Icon(
-                          Icons.close,
-                          color:
-                              Colors.white.withValues(
-                            alpha:
-                                0.95,
-                          ),
-                          size:
-                              19,
-                        ),
+                              Icons.close,
+                              color:
+                                  Colors.white.withValues(
+                                alpha:
+                                    0.95,
+                                ),
+                              size:
+                                  19,
+                            ),
                       ),
                     ),
                   ],
@@ -2002,7 +2402,6 @@ class _MainNavigationState extends State<MainNavigation>
 
               // =================================================
               // BARRE DE PROGRESSION
-              // MÊME FENÊTRE / 8 SECONDES
               // =================================================
 
               TweenAnimationBuilder<double>(

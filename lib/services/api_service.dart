@@ -19,7 +19,7 @@ class ApiService {
   /// cette même configuration peut être utilisée avec
   /// l'adresse locale adaptée.
   static const String baseUrl =
-      'http://localhost:8080';
+    'https://humble-bravery-production-282c.up.railway.app';
 
   final http.Client _client;
 
