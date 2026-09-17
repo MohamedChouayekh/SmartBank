@@ -8,16 +8,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Base64;
-
 @Service
 public class EmailService {
 
-    @Value("${MAILJET_API_KEY:}")
+    @Value("${SENDGRID_API_KEY:}")
     private String apiKey;
-
-    @Value("${MAILJET_SECRET_KEY:}")
-    private String secretKey;
 
     @Value("${MAIL_USERNAME:}")
     private String senderEmail;
@@ -40,24 +35,21 @@ public class EmailService {
                         + "L'équipe SmartBank";
 
         try {
-            String url = "https://api.mailjet.com/v3.1/send";
-
-            String auth = apiKey + ":" + secretKey;
-            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
+            String url = "https://api.sendgrid.com/v3/mail/send";
 
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Basic " + encodedAuth);
+            headers.set("Authorization", "Bearer " + apiKey);
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             String escapedText = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
 
             String jsonBody = "{"
-                    + "\"Messages\":[{"
-                    + "\"From\":{\"Email\":\"" + senderEmail + "\",\"Name\":\"SmartBank\"},"
-                    + "\"To\":[{\"Email\":\"" + email + "\"}],"
-                    + "\"Subject\":\"SmartBank - Code de vérification\","
-                    + "\"TextPart\":\"" + escapedText + "\""
-                    + "}]"
+                    + "\"personalizations\":[{"
+                    + "\"to\":[{\"email\":\"" + email + "\"}]"
+                    + "}],"
+                    + "\"from\":{\"email\":\"" + senderEmail + "\",\"name\":\"SmartBank\"},"
+                    + "\"subject\":\"SmartBank - Code de vérification\","
+                    + "\"content\":[{\"type\":\"text/plain\",\"value\":\"" + escapedText + "\"}]"
                     + "}";
 
             HttpEntity<String> request = new HttpEntity<>(jsonBody, headers);
