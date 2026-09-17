@@ -1,21 +1,28 @@
-        package com.smartbank.backend.service;
+package com.smartbank.backend.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Base64;
 
 @Service
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${MAILJET_API_KEY:}")
+    private String apiKey;
 
-    @Value("${spring.mail.username}")
+    @Value("${MAILJET_SECRET_KEY:}")
+    private String secretKey;
+
+    @Value("${MAIL_USERNAME:}")
     private String senderEmail;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    private final RestTemplate restTemplate = new RestTemplate();
 
     public void sendOtpEmail(String email, String otp) {
 
@@ -33,18 +40,31 @@ public class EmailService {
                         + "L'équipe SmartBank";
 
         try {
+            String url = "https://api.mailjet.com/v3.1/send";
 
-            SimpleMailMessage message = new SimpleMailMessage();
+            String auth = apiKey + ":" + secretKey;
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
 
-            message.setFrom(senderEmail);
-            message.setTo(email);
-            message.setSubject("SmartBank - Code de vérification");
-            message.setText(text);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Basic " + encodedAuth);
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-            mailSender.send(message);
+            String escapedText = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+
+            String jsonBody = "{"
+                    + "\"Messages\":[{"
+                    + "\"From\":{\"Email\":\"" + senderEmail + "\",\"Name\":\"SmartBank\"},"
+                    + "\"To\":[{\"Email\":\"" + email + "\"}],"
+                    + "\"Subject\":\"SmartBank - Code de vérification\","
+                    + "\"TextPart\":\"" + escapedText + "\""
+                    + "}]"
+                    + "}";
+
+            HttpEntity<String> request = new HttpEntity<>(jsonBody, headers);
+
+            restTemplate.exchange(url, HttpMethod.POST, request, String.class);
 
         } catch (Exception e) {
-
             throw new IllegalStateException(
                     "Impossible d'envoyer l'email OTP.",
                     e
