@@ -56,12 +56,16 @@ public class CardUnblockRequestController {
                     toResponse(created)
             );
 
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
+
+            e.printStackTrace();
 
             return ResponseEntity.badRequest()
                     .body(Map.of(
                             "message",
-                            e.getMessage()
+                            e.getMessage() != null
+                                    ? e.getMessage()
+                                    : e.getClass().getName()
                     ));
         }
     }
