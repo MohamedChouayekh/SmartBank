@@ -1,6 +1,6 @@
 package com.smartbank.backend.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.smartbank.backend.entity.CardUnblockRequest;
 import com.smartbank.backend.service.CardUnblockRequestService;
 import org.springframework.http.ResponseEntity;
@@ -13,14 +13,11 @@ import java.util.Map;
 public class CardUnblockRequestController {
 
     private final CardUnblockRequestService requestService;
-    private final ObjectMapper objectMapper;
 
     public CardUnblockRequestController(
-            CardUnblockRequestService requestService,
-            ObjectMapper objectMapper) {
+            CardUnblockRequestService requestService) {
 
         this.requestService = requestService;
-        this.objectMapper = objectMapper;
     }
 
     // =========================================================
@@ -30,37 +27,31 @@ public class CardUnblockRequestController {
     @PostMapping("/api/cards/{cardId}/unblock-request")
     public ResponseEntity<?> createRequest(
             @PathVariable Long cardId,
-            @RequestBody String rawBody) {
+            @RequestBody JsonNode request) {
 
         try {
 
             System.out.println(
                     "[UNBLOCK REQUEST] cardId="
                             + cardId
-                            + " rawBody="
-                            + rawBody
+                            + " body="
+                            + request
             );
 
-            Map<String, Object> request =
-                    objectMapper.readValue(
-                            rawBody,
-                            Map.class
-                    );
-
-            if (request.get("userId") == null) {
+            if (!request.hasNonNull("userId")) {
                 throw new RuntimeException(
                         "Utilisateur obligatoire."
                 );
             }
 
-            Long userId = Long.valueOf(
-                    request.get("userId").toString()
-            );
+            Long userId =
+                    request.get("userId").asLong();
 
             String message = null;
 
-            if (request.get("message") != null) {
-                message = request.get("message").toString();
+            if (request.hasNonNull("message")) {
+                message =
+                        request.get("message").asText();
             }
 
             CardUnblockRequest created =
