@@ -1,4 +1,4 @@
-package com.smartbank.backend.controller;
+        package com.smartbank.backend.controller;
 
 import com.smartbank.backend.dto.BeneficiaryInfo;
 import com.smartbank.backend.entity.Account;
@@ -20,25 +20,78 @@ public class AccountController {
     }
 
     // =========================================================
-    // CRÉER UN COMPTE BANCAIRE
+    // CRÉER UN COMPTE
     // =========================================================
 
     @PostMapping
-    public ResponseEntity<Account> createAccount(
+    public ResponseEntity<?> createAccount(
             @RequestBody Map<String, Object> request) {
 
-        Long userId = Long.valueOf(
-                request.get("userId").toString()
-        );
+        try {
 
-        String type = request.get("type").toString();
+            if (request.get("userId") == null) {
+                throw new RuntimeException(
+                        "Utilisateur obligatoire."
+                );
+            }
 
-        Account account = accountService.createAccount(
-                userId,
-                type
-        );
+            if (request.get("type") == null) {
+                throw new RuntimeException(
+                        "Le type de compte est obligatoire."
+                );
+            }
 
-        return ResponseEntity.ok(account);
+            Long userId = Long.valueOf(
+                    request.get("userId").toString()
+            );
+
+            String type = request.get("type")
+                    .toString()
+                    .trim()
+                    .toUpperCase();
+
+            Account account =
+                    accountService.createAccount(
+                            userId,
+                            type
+                    );
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Compte créé avec succès.",
+
+                            "id",
+                            account.getId(),
+
+                            "accountNumber",
+                            account.getAccountNumber(),
+
+                            "type",
+                            account.getType(),
+
+                            "balance",
+                            account.getBalance(),
+
+                            "currency",
+                            account.getCurrency(),
+
+                            "userId",
+                            account.getUser().getId()
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(Map.of(
+                            "message",
+                            e.getMessage() != null
+                                    ? e.getMessage()
+                                    : "Erreur lors de la création du compte."
+                    ));
+        }
     }
 
     // =========================================================
@@ -47,7 +100,6 @@ public class AccountController {
 
     @GetMapping
     public ResponseEntity<List<Account>> getAllAccounts() {
-
         return ResponseEntity.ok(
                 accountService.getAllAccounts()
         );
@@ -61,7 +113,8 @@ public class AccountController {
     public ResponseEntity<Account> getAccountById(
             @PathVariable Long id) {
 
-        return accountService.getAccountById(id)
+        return accountService
+                .getAccountById(id)
                 .map(ResponseEntity::ok)
                 .orElse(
                         ResponseEntity.notFound().build()
@@ -91,7 +144,9 @@ public class AccountController {
 
         return accountService
                 .getAccountByAccountNumber(
-                        accountNumber.trim().toUpperCase()
+                        accountNumber
+                                .trim()
+                                .toUpperCase()
                 )
                 .map(account -> {
 
@@ -104,8 +159,10 @@ public class AccountController {
 
                     return ResponseEntity.ok(info);
                 })
-                .orElseGet(() ->
-                        ResponseEntity.notFound().build()
+                .orElseGet(
+                        () -> ResponseEntity
+                                .notFound()
+                                .build()
                 );
     }
 }
