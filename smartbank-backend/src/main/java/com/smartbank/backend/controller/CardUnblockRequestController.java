@@ -82,6 +82,34 @@ public class CardUnblockRequestController {
     }
 
     // =========================================================
+    // DIAGNOSTIC : TESTER LA RÉCEPTION DU JSON
+    // =========================================================
+
+    @PostMapping("/api/cards/{cardId}/unblock-request-test")
+    public ResponseEntity<?> testUnblockRequest(
+            @PathVariable Long cardId,
+            @RequestBody JsonNode request) {
+
+        System.out.println(
+                "[UNBLOCK TEST] cardId="
+                        + cardId
+                        + " body="
+                        + request
+        );
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "message",
+                        "JSON reçu correctement.",
+                        "cardId",
+                        cardId,
+                        "body",
+                        request.toString()
+                )
+        );
+    }
+
+    // =========================================================
     // CLIENT : VOIR SES DEMANDES
     // =========================================================
 
@@ -202,9 +230,10 @@ public class CardUnblockRequestController {
                 );
             }
 
-            Long adminId = Long.valueOf(
-                    request.get("adminId").toString()
-            );
+            Long adminId =
+                    Long.valueOf(
+                            request.get("adminId").toString()
+                    );
 
             String adminResponse = null;
 
@@ -260,9 +289,10 @@ public class CardUnblockRequestController {
                 );
             }
 
-            Long adminId = Long.valueOf(
-                    request.get("adminId").toString()
-            );
+            Long adminId =
+                    Long.valueOf(
+                            request.get("adminId").toString()
+                    );
 
             String adminResponse = null;
 
