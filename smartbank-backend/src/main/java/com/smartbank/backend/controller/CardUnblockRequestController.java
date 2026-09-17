@@ -1,10 +1,7 @@
 package com.smartbank.backend.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartbank.backend.entity.CardUnblockRequest;
 import com.smartbank.backend.service.CardUnblockRequestService;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,14 +13,11 @@ import java.util.Map;
 public class CardUnblockRequestController {
 
     private final CardUnblockRequestService requestService;
-    private final ObjectMapper objectMapper;
 
     public CardUnblockRequestController(
-            CardUnblockRequestService requestService,
-            ObjectMapper objectMapper) {
+            CardUnblockRequestService requestService) {
 
         this.requestService = requestService;
-        this.objectMapper = objectMapper;
     }
 
     // =========================================================
@@ -33,39 +27,12 @@ public class CardUnblockRequestController {
     @PostMapping("/api/cards/{cardId}/unblock-request")
     public ResponseEntity<?> createRequest(
             @PathVariable Long cardId,
-            HttpServletRequest httpRequest) {
+            @RequestBody Map<String, Object> request) {
 
         try {
 
-            String rawBody =
-                    httpRequest.getReader()
-                            .lines()
-                            .reduce(
-                                    "",
-                                    (current, line) ->
-                                            current + line
-                            );
-
-            System.out.println(
-                    "[UNBLOCK REQUEST] cardId="
-                            + cardId
-                            + " body="
-                            + rawBody
-            );
-
-            if (rawBody == null ||
-                    rawBody.trim().isEmpty()) {
-
-                throw new RuntimeException(
-                        "Corps de la requête obligatoire."
-                );
-            }
-
-            JsonNode json =
-                    objectMapper.readTree(rawBody);
-
-            if (json == null ||
-                    !json.hasNonNull("userId")) {
+            if (request == null ||
+                    request.get("userId") == null) {
 
                 throw new RuntimeException(
                         "Utilisateur obligatoire."
@@ -73,13 +40,15 @@ public class CardUnblockRequestController {
             }
 
             Long userId =
-                    json.get("userId").asLong();
+                    Long.valueOf(
+                            request.get("userId").toString()
+                    );
 
             String message = null;
 
-            if (json.hasNonNull("message")) {
+            if (request.get("message") != null) {
                 message =
-                        json.get("message").asText();
+                        request.get("message").toString();
             }
 
             CardUnblockRequest created =
@@ -228,24 +197,12 @@ public class CardUnblockRequestController {
     )
     public ResponseEntity<?> approveRequest(
             @PathVariable Long requestId,
-            HttpServletRequest httpRequest) {
+            @RequestBody Map<String, Object> request) {
 
         try {
 
-            String rawBody =
-                    httpRequest.getReader()
-                            .lines()
-                            .reduce(
-                                    "",
-                                    (current, line) ->
-                                            current + line
-                            );
-
-            JsonNode json =
-                    objectMapper.readTree(rawBody);
-
-            if (json == null ||
-                    !json.hasNonNull("adminId")) {
+            if (request == null ||
+                    request.get("adminId") == null) {
 
                 throw new RuntimeException(
                         "Administrateur obligatoire."
@@ -253,13 +210,15 @@ public class CardUnblockRequestController {
             }
 
             Long adminId =
-                    json.get("adminId").asLong();
+                    Long.valueOf(
+                            request.get("adminId").toString()
+                    );
 
             String adminResponse = null;
 
-            if (json.hasNonNull("adminResponse")) {
+            if (request.get("adminResponse") != null) {
                 adminResponse =
-                        json.get("adminResponse").asText();
+                        request.get("adminResponse").toString();
             }
 
             CardUnblockRequest approved =
@@ -286,7 +245,9 @@ public class CardUnblockRequestController {
                     .body(
                             Map.of(
                                     "message",
-                                    e.getMessage()
+                                    e.getMessage() != null
+                                            ? e.getMessage()
+                                            : "Erreur lors de l'approbation."
                             )
                     );
 
@@ -315,24 +276,12 @@ public class CardUnblockRequestController {
     )
     public ResponseEntity<?> rejectRequest(
             @PathVariable Long requestId,
-            HttpServletRequest httpRequest) {
+            @RequestBody Map<String, Object> request) {
 
         try {
 
-            String rawBody =
-                    httpRequest.getReader()
-                            .lines()
-                            .reduce(
-                                    "",
-                                    (current, line) ->
-                                            current + line
-                            );
-
-            JsonNode json =
-                    objectMapper.readTree(rawBody);
-
-            if (json == null ||
-                    !json.hasNonNull("adminId")) {
+            if (request == null ||
+                    request.get("adminId") == null) {
 
                 throw new RuntimeException(
                         "Administrateur obligatoire."
@@ -340,13 +289,15 @@ public class CardUnblockRequestController {
             }
 
             Long adminId =
-                    json.get("adminId").asLong();
+                    Long.valueOf(
+                            request.get("adminId").toString()
+                    );
 
             String adminResponse = null;
 
-            if (json.hasNonNull("adminResponse")) {
+            if (request.get("adminResponse") != null) {
                 adminResponse =
-                        json.get("adminResponse").asText();
+                        request.get("adminResponse").toString();
             }
 
             CardUnblockRequest rejected =
@@ -373,7 +324,9 @@ public class CardUnblockRequestController {
                     .body(
                             Map.of(
                                     "message",
-                                    e.getMessage()
+                                    e.getMessage() != null
+                                            ? e.getMessage()
+                                            : "Erreur lors du rejet."
                             )
                     );
 
