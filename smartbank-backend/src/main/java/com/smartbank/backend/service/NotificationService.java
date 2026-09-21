@@ -277,4 +277,22 @@ public class NotificationService {
                 notification
         );
     }
+
+    public void notifySupport(
+            Long userId,
+            String title,
+            String message) {
+
+        createNotification(
+                userId,
+                "SUPPORT",
+                title,
+                message,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
 }

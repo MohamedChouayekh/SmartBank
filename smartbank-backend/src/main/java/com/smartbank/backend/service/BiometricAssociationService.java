@@ -19,36 +19,25 @@ public class BiometricAssociationService {
 
     private final BiometricAssociationRepository biometricRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public BiometricAssociationService(
             BiometricAssociationRepository biometricRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            NotificationService notificationService
     ) {
-        this.biometricRepository = biometricRepository;
-        this.userRepository = userRepository;
+        this.biometricRepository =
+                biometricRepository;
+
+        this.userRepository =
+                userRepository;
+
+        this.notificationService =
+                notificationService;
     }
 
     // =========================================================
     // ACTIVER LA BIOMÉTRIE
-    // =========================================================
-    //
-    // RÈGLE :
-    //
-    // 1. Si aucun appareil n'est associé :
-    //      → on crée l'association.
-    //
-    // 2. Si l'appareil est associé au MÊME compte :
-    //      → on réactive.
-    //
-    // 3. Si l'appareil est associé à un AUTRE compte
-    //    ET que cette association est encore ACTIVE :
-    //      → REFUS.
-    //
-    // 4. Si l'appareil était associé à un autre compte
-    //    mais que ce compte a désactivé la biométrie :
-    //      → l'appareil est LIBRE.
-    //      → le nouveau compte peut prendre l'association.
-    //
     // =========================================================
 
     public BiometricAssociation enable(
@@ -98,9 +87,19 @@ public class BiometricAssociationService {
             association.setLastEnabledAt(now);
             association.setDisabledAt(null);
 
-            return biometricRepository.save(
-                    association
+            BiometricAssociation saved =
+                    biometricRepository.save(
+                            association
+                    );
+
+            notificationService.notifySecurity(
+                    userId,
+                    "Biométrie activée",
+                    "L'authentification biométrique a été activée "
+                            + "sur votre appareil."
             );
+
+            return saved;
         }
 
         BiometricAssociation association =
@@ -118,13 +117,31 @@ public class BiometricAssociationService {
             LocalDateTime now =
                     LocalDateTime.now();
 
+            boolean wasEnabled =
+                    association.isEnabled();
+
             association.setEnabled(true);
             association.setLastEnabledAt(now);
             association.setDisabledAt(null);
 
-            return biometricRepository.save(
-                    association
-            );
+            BiometricAssociation saved =
+                    biometricRepository.save(
+                            association
+                    );
+
+            // Notification uniquement lorsqu'elle
+            // était réellement désactivée avant.
+            if (!wasEnabled) {
+
+                notificationService.notifySecurity(
+                        userId,
+                        "Biométrie activée",
+                        "L'authentification biométrique a été "
+                                + "réactivée sur votre appareil."
+                );
+            }
+
+            return saved;
         }
 
         // =====================================================
@@ -142,13 +159,6 @@ public class BiometricAssociationService {
         // =====================================================
         // AUTRE COMPTE MAIS ASSOCIATION DÉSACTIVÉE
         // =====================================================
-        //
-        // L'ancien compte a désactivé sa biométrie.
-        // Le téléphone est donc maintenant libre.
-        //
-        // On réattribue l'association au nouveau compte.
-        //
-        // =====================================================
 
         LocalDateTime now =
                 LocalDateTime.now();
@@ -158,23 +168,23 @@ public class BiometricAssociationService {
         association.setLastEnabledAt(now);
         association.setDisabledAt(null);
 
-        return biometricRepository.save(
-                association
+        BiometricAssociation saved =
+                biometricRepository.save(
+                        association
+                );
+
+        notificationService.notifySecurity(
+                userId,
+                "Biométrie activée",
+                "L'authentification biométrique a été activée "
+                        + "sur votre appareil."
         );
+
+        return saved;
     }
 
     // =========================================================
     // DÉSACTIVER LA BIOMÉTRIE
-    // =========================================================
-    //
-    // La désactivation LIBÈRE le téléphone.
-    //
-    // Nous conservons la ligne en base pour l'historique,
-    // mais enabled passe à false.
-    //
-    // Ainsi un autre compte peut ensuite utiliser
-    // ce même téléphone.
-    //
     // =========================================================
 
     public BiometricAssociation disable(
@@ -215,6 +225,14 @@ public class BiometricAssociationService {
         }
 
         // =====================================================
+        // DÉJÀ DÉSACTIVÉE
+        // =====================================================
+
+        if (!association.isEnabled()) {
+            return association;
+        }
+
+        // =====================================================
         // LIBÉRER LE TÉLÉPHONE
         // =====================================================
 
@@ -223,9 +241,19 @@ public class BiometricAssociationService {
                 LocalDateTime.now()
         );
 
-        return biometricRepository.save(
-                association
+        BiometricAssociation saved =
+                biometricRepository.save(
+                        association
+                );
+
+        notificationService.notifySecurity(
+                userId,
+                "Biométrie désactivée",
+                "L'authentification biométrique a été désactivée "
+                        + "sur votre appareil."
         );
+
+        return saved;
     }
 
     // =========================================================
@@ -245,10 +273,6 @@ public class BiometricAssociationService {
                         .findByDeviceIdentifier(
                                 deviceIdentifier
                         );
-
-        // =====================================================
-        // AUCUNE ASSOCIATION
-        // =====================================================
 
         if (optional.isEmpty()) {
 
@@ -278,10 +302,6 @@ public class BiometricAssociationService {
         BiometricAssociation association =
                 optional.get();
 
-        // =====================================================
-        // ASSOCIATION TROUVÉE
-        // =====================================================
-
         response.put(
                 "associated",
                 true
@@ -292,11 +312,6 @@ public class BiometricAssociationService {
                 association.isEnabled()
         );
 
-        // IMPORTANT :
-        // si enabled = false, le téléphone est LIBRE.
-        //
-        // On renvoie quand même l'ancien userId pour
-        // l'information / historique.
         response.put(
                 "ownerUserId",
                 association.getUser().getId()
@@ -349,10 +364,6 @@ public class BiometricAssociationService {
                                 userId
                         );
 
-        // =====================================================
-        // LE COMPTE A-T-IL UNE ASSOCIATION ?
-        // =====================================================
-
         response.put(
                 "userId",
                 userId
@@ -363,10 +374,6 @@ public class BiometricAssociationService {
                 !associations.isEmpty()
         );
 
-        // =====================================================
-        // LE COMPTE A-T-IL UNE BIOMÉTRIE ACTIVE ?
-        // =====================================================
-
         response.put(
                 "enabled",
                 !enabledAssociations.isEmpty()
@@ -376,10 +383,6 @@ public class BiometricAssociationService {
                 "associationCount",
                 associations.size()
         );
-
-        // =====================================================
-        // APPAREIL ACTUELLEMENT ACTIF
-        // =====================================================
 
         if (!enabledAssociations.isEmpty()) {
 

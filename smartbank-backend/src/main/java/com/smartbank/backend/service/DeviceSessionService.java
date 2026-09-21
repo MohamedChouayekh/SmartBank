@@ -18,16 +18,21 @@ public class DeviceSessionService {
 
     private final DeviceSessionRepository deviceSessionRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public DeviceSessionService(
             DeviceSessionRepository deviceSessionRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            NotificationService notificationService
     ) {
         this.deviceSessionRepository =
                 deviceSessionRepository;
 
         this.userRepository =
                 userRepository;
+
+        this.notificationService =
+                notificationService;
     }
 
     // =========================================================
@@ -60,6 +65,10 @@ public class DeviceSessionService {
 
         DeviceSession session;
 
+        // =====================================================
+        // SESSION EXISTANTE
+        // =====================================================
+
         if (existing.isPresent()) {
 
             session =
@@ -89,7 +98,13 @@ public class DeviceSessionService {
                     LocalDateTime.now()
             );
 
-        } else {
+        }
+
+        // =====================================================
+        // NOUVEL APPAREIL
+        // =====================================================
+
+        else {
 
             session =
                     new DeviceSession();
@@ -125,6 +140,44 @@ public class DeviceSessionService {
             session.setLastActivity(
                     LocalDateTime.now()
             );
+
+            session =
+                    deviceSessionRepository.save(
+                            session
+                    );
+
+            // =================================================
+            // ALERTE DE SÉCURITÉ
+            // =================================================
+
+            String deviceDescription =
+                    deviceName != null &&
+                            !deviceName.trim().isEmpty()
+                            ? deviceName.trim()
+                            : "un nouvel appareil";
+
+            String message =
+                    "Une nouvelle connexion à votre compte "
+                            + "SmartBank a été détectée depuis "
+                            + deviceDescription
+                            + ".";
+
+            if (browser != null &&
+                    !browser.trim().isEmpty()) {
+
+                message +=
+                        " Navigateur : "
+                                + browser.trim()
+                                + ".";
+            }
+
+            notificationService.notifySecurity(
+                    userId,
+                    "Nouvel appareil détecté",
+                    message
+            );
+
+            return session;
         }
 
         return deviceSessionRepository.save(

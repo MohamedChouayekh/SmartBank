@@ -18,15 +18,18 @@ public class CardUnblockRequestService {
     private final CardUnblockRequestRepository requestRepository;
     private final CardRepository cardRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public CardUnblockRequestService(
             CardUnblockRequestRepository requestRepository,
             CardRepository cardRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            NotificationService notificationService) {
 
         this.requestRepository = requestRepository;
         this.cardRepository = cardRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     // =========================================================
@@ -117,7 +120,22 @@ public class CardUnblockRequestService {
             );
         }
 
-        return requestRepository.save(request);
+        CardUnblockRequest savedRequest =
+                requestRepository.save(request);
+
+        // -----------------------------------------------------
+        // NOTIFICATION DE SÉCURITÉ
+        // -----------------------------------------------------
+
+        notificationService.notifySecurity(
+                userId,
+                "Demande de déblocage envoyée",
+                "Votre demande de déblocage de la carte se terminant par **** "
+                        + card.getLastFourDigits()
+                        + " a été envoyée à la banque. Elle est actuellement en attente de traitement."
+        );
+
+        return savedRequest;
     }
 
     // =========================================================
@@ -252,7 +270,22 @@ public class CardUnblockRequestService {
             );
         }
 
-        return requestRepository.save(request);
+        CardUnblockRequest savedRequest =
+                requestRepository.save(request);
+
+        // -----------------------------------------------------
+        // NOTIFICATION DE SÉCURITÉ
+        // -----------------------------------------------------
+
+        notificationService.notifySecurity(
+                request.getUser().getId(),
+                "Demande de déblocage acceptée",
+                "Votre demande de déblocage de la carte se terminant par **** "
+                        + card.getLastFourDigits()
+                        + " a été acceptée par la banque. Votre carte est maintenant active."
+        );
+
+        return savedRequest;
     }
 
     // =========================================================
@@ -312,7 +345,29 @@ public class CardUnblockRequestService {
             );
         }
 
-        return requestRepository.save(request);
+        CardUnblockRequest savedRequest =
+                requestRepository.save(request);
+
+        // -----------------------------------------------------
+        // NOTIFICATION DE SÉCURITÉ
+        // -----------------------------------------------------
+
+        String responseMessage =
+                adminResponse != null &&
+                        !adminResponse.trim().isEmpty()
+                        ? " Motif : " + adminResponse.trim()
+                        : "";
+
+        notificationService.notifySecurity(
+                request.getUser().getId(),
+                "Demande de déblocage refusée",
+                "Votre demande de déblocage de la carte se terminant par **** "
+                        + card.getLastFourDigits()
+                        + " a été refusée par la banque."
+                        + responseMessage
+        );
+
+        return savedRequest;
     }
 
     // =========================================================

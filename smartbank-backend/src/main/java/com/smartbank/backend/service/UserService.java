@@ -1,4 +1,4 @@
-        package com.smartbank.backend.service;
+package com.smartbank.backend.service;
 
 import com.smartbank.backend.entity.User;
 import com.smartbank.backend.repository.BiometricAssociationRepository;
@@ -18,13 +18,15 @@ public class UserService {
     private final BiometricAssociationRepository biometricAssociationRepository;
     private final AccountService accountService;
     private final CardService cardService;
+    private final NotificationService notificationService;
 
     public UserService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             BiometricAssociationRepository biometricAssociationRepository,
             AccountService accountService,
-            CardService cardService
+            CardService cardService,
+            NotificationService notificationService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -32,6 +34,7 @@ public class UserService {
                 biometricAssociationRepository;
         this.accountService = accountService;
         this.cardService = cardService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -43,6 +46,7 @@ public class UserService {
 
         if (user.getRole() == null ||
                 user.getRole().trim().isEmpty()) {
+
             user.setRole("CLIENT");
         }
 
@@ -116,6 +120,7 @@ public class UserService {
         userRepository.deleteById(id);
     }
 
+    @Transactional
     public Optional<User> login(
             String username,
             String password
@@ -124,22 +129,60 @@ public class UserService {
         Optional<User> userOptional =
                 userRepository.findByUsername(username);
 
+        // =====================================================
+        // IDENTIFIANT INEXISTANT
+        // =====================================================
+
         if (userOptional.isEmpty()) {
             return Optional.empty();
         }
 
         User user = userOptional.get();
 
+        // =====================================================
+        // COMPTE DÉSACTIVÉ
+        // =====================================================
+
         if (!user.isEnabled()) {
+
+            notificationService.notifySecurity(
+                    user.getId(),
+                    "Tentative de connexion",
+                    "Une tentative de connexion a été effectuée "
+                            + "sur votre compte alors que celui-ci est désactivé."
+            );
+
             return Optional.empty();
         }
+
+        // =====================================================
+        // MOT DE PASSE INCORRECT
+        // =====================================================
 
         if (!passwordEncoder.matches(
                 password,
                 user.getPassword()
         )) {
+
+            notificationService.notifySecurity(
+                    user.getId(),
+                    "Échec de connexion",
+                    "Une tentative de connexion avec un mot de passe incorrect "
+                            + "a été détectée sur votre compte."
+            );
+
             return Optional.empty();
         }
+
+        // =====================================================
+        // CONNEXION RÉUSSIE
+        // =====================================================
+
+        notificationService.notifySecurity(
+                user.getId(),
+                "Connexion réussie",
+                "Une connexion à votre compte SmartBank vient d’être effectuée."
+        );
 
         return Optional.of(user);
     }
