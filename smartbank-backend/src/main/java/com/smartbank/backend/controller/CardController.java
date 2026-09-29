@@ -346,7 +346,55 @@ public class CardController {
                     ));
         }
     }
+// =========================================================
+// PAIEMENT PAR CARTE
+// =========================================================
 
+    @PostMapping("/{cardId}/pay")
+    public ResponseEntity<?> payWithCard(
+            @PathVariable Long cardId,
+            @RequestBody Map<String, Object> request) {
+
+        try {
+
+            if (request.get("userId") == null) {
+                throw new RuntimeException("Utilisateur obligatoire.");
+            }
+
+            if (request.get("amount") == null) {
+                throw new RuntimeException("Montant obligatoire.");
+            }
+
+            Long userId = Long.valueOf(request.get("userId").toString());
+
+            BigDecimal amount = new BigDecimal(request.get("amount").toString());
+
+            String merchant = request.get("merchant") != null
+                    ? request.get("merchant").toString()
+                    : "Marchand";
+
+            BigDecimal newBalance = cardService.payWithCard(
+                    userId, cardId, amount, merchant
+            );
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message", "Paiement effectué avec succès.",
+                            "amount", amount,
+                            "newBalance", newBalance
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message", e.getMessage() != null
+                                    ? e.getMessage()
+                                    : "Erreur lors du paiement."
+                    ));
+        }
+    }
     // =========================================================
     // BLOQUER UNE CARTE
     // =========================================================

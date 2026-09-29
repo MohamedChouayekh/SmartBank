@@ -650,6 +650,90 @@ public class TransactionService {
                 amount
         );
     }
+    // =========================================================
+// PAIEMENT PAR CARTE (débit réel, sans logique facture)
+// =========================================================
+    @Transactional
+    public void makeCardPayment(
+            String accountNumber,
+            String merchant,
+            BigDecimal amount) {
+
+        if (amount == null ||
+                amount.compareTo(BigDecimal.ZERO) <= 0) {
+
+            throw new RuntimeException(
+                    "Le montant doit être supérieur à 0."
+            );
+        }
+
+        if (accountNumber == null ||
+                accountNumber.trim().isEmpty()) {
+
+            throw new RuntimeException(
+                    "Le compte est obligatoire."
+            );
+        }
+
+        Account account =
+                accountRepository
+                        .findByAccountNumber(accountNumber.trim())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Compte introuvable."
+                                )
+                        );
+
+        String accountType =
+                account.getType() == null
+                        ? ""
+                        : account.getType().trim().toUpperCase();
+
+        if (!"CURRENT".equals(accountType)) {
+            throw new RuntimeException(
+                    "Les paiements par carte sont uniquement "
+                            + "autorisés depuis le compte courant."
+            );
+        }
+
+        if (account.getBalance().compareTo(amount) < 0) {
+            throw new RuntimeException(
+                    "Solde insuffisant."
+            );
+        }
+
+        account.setBalance(
+                account.getBalance().subtract(amount)
+        );
+
+        accountRepository.save(account);
+
+        Transaction transaction = new Transaction();
+        transaction.setAccount(account);
+        transaction.setType("CARD_PAYMENT");
+        transaction.setAmount(amount);
+        transaction.setLabel(
+                "Paiement carte - " + merchant
+        );
+        transaction.setReference(merchant);
+
+        transactionRepository.save(transaction);
+
+        notificationService.notifyPayment(
+                account.getUser().getId(),
+                "Paiement par carte",
+                "Paiement de " + amount + " TND chez " + merchant + "."
+        );
+
+        // =====================================================
+        // MOTEUR PROMOTIONS - CARTE (cashback + challenge)
+        // =====================================================
+        promotionEngineService.evaluateCardPayment(
+                account,
+                amount,
+                merchant
+        );
+    }
 
     // =========================================================
     // RETRAIT D'ESPÈCES

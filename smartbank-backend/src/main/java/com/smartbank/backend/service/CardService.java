@@ -382,7 +382,66 @@ public class CardService {
                 amount
         );
     }
+// =========================================================
+// PAIEMENT PAR CARTE
+// =========================================================
 
+    @Transactional
+    public BigDecimal payWithCard(
+            Long userId,
+            Long cardId,
+            BigDecimal amount,
+            String merchant) {
+
+        if (userId == null) {
+            throw new RuntimeException("Utilisateur obligatoire.");
+        }
+
+        if (cardId == null) {
+            throw new RuntimeException("Carte obligatoire.");
+        }
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Le montant doit être supérieur à 0.");
+        }
+
+        Card card = cardRepository
+                .findByIdAndAccount_User_Id(cardId, userId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Carte introuvable ou non autorisée."
+                ));
+
+        if (!"ACTIVE".equalsIgnoreCase(card.getStatus())) {
+            throw new RuntimeException("Cette carte n'est pas active.");
+        }
+
+        if (isExpired(card.getExpiryDate())) {
+            throw new RuntimeException(
+                    "Cette carte est expirée. Le paiement est impossible."
+            );
+        }
+
+        Account account = card.getAccount();
+
+        if (account == null) {
+            throw new RuntimeException(
+                    "Aucun compte n'est associé à cette carte."
+            );
+        }
+
+        String merchantName = merchant == null || merchant.trim().isEmpty()
+                ? "Marchand" : merchant.trim();
+
+        transactionService.makeCardPayment(
+                account.getAccountNumber(),
+                merchantName,
+                amount
+        );
+
+        return accountRepository.findById(account.getId())
+                .map(Account::getBalance)
+                .orElse(account.getBalance());
+    }
     // =========================================================
     // BLOQUER UNE CARTE
     // =========================================================
