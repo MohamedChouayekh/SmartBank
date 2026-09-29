@@ -394,4 +394,145 @@ public class TransactionController {
                     );
         }
     }
+    // =========================================================
+// PAIEMENT PAR CARTE
+// =========================================================
+
+    @PostMapping("/card-payment")
+    public ResponseEntity<?> makeCardPayment(
+            @RequestBody Map<String, Object> request) {
+
+        try {
+
+            // =====================================================
+            // VALIDATION DES CHAMPS OBLIGATOIRES
+            // =====================================================
+
+            if (request.get("accountNumber") == null ||
+                    request.get("merchant") == null ||
+                    request.get("amount") == null) {
+
+                return ResponseEntity.badRequest()
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "Compte, commerçant et montant obligatoires."
+                                )
+                        );
+            }
+
+            // =====================================================
+            // COMPTE
+            // =====================================================
+
+            String accountNumber =
+                    request.get("accountNumber")
+                            .toString()
+                            .trim();
+
+            // =====================================================
+            // COMMERÇANT
+            // =====================================================
+
+            String merchant =
+                    request.get("merchant")
+                            .toString()
+                            .trim();
+
+            if (merchant.isEmpty()) {
+
+                return ResponseEntity.badRequest()
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "Le commerçant est obligatoire."
+                                )
+                        );
+            }
+
+            // =====================================================
+            // MONTANT
+            // =====================================================
+
+            BigDecimal amount;
+
+            try {
+
+                amount = new BigDecimal(
+                        request.get("amount")
+                                .toString()
+                );
+
+            } catch (NumberFormatException e) {
+
+                return ResponseEntity.badRequest()
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "Le montant du paiement par carte est invalide."
+                                )
+                        );
+            }
+
+            // =====================================================
+            // EXÉCUTION
+            // =====================================================
+
+            transactionService.makeCardPayment(
+                    accountNumber,
+                    merchant,
+                    amount
+            );
+
+            // =====================================================
+            // RÉCUPÉRER LE COMPTE POUR LE NOUVEAU SOLDE
+            // =====================================================
+
+            Optional<Account> accountOpt =
+                    accountService.getAccountByAccountNumber(
+                            accountNumber
+                    );
+
+            BigDecimal newBalance =
+                    accountOpt
+                            .map(Account::getBalance)
+                            .orElse(BigDecimal.ZERO);
+
+            // =====================================================
+            // RÉPONSE
+            // =====================================================
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Paiement par carte effectué avec succès.",
+
+                            "amount",
+                            amount,
+
+                            "merchant",
+                            merchant,
+
+                            "accountNumber",
+                            accountNumber,
+
+                            "newBalance",
+                            newBalance
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage() != null
+                                            ? e.getMessage()
+                                            : "Erreur lors du paiement par carte."
+                            )
+                    );
+        }
+    }
 }

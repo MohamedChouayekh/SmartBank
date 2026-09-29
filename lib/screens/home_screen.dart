@@ -63,6 +63,14 @@ class _HomeScreenState extends State<HomeScreen>
   int? _currentAccountId;
 
   // ============================================================
+  // RÉCOMPENSES
+  // ============================================================
+
+  Map<String, dynamic>? _rewardWallet;
+
+  bool _isLoadingRewards = true;
+
+  // ============================================================
   // ACTUALISATION
   // ============================================================
 
@@ -87,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen>
     WidgetsBinding.instance.addObserver(this);
 
     _loadAccountAndTransactions();
+    _loadRewards();
 
     _startAutoRefresh();
   }
@@ -101,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen>
   ) {
     if (state == AppLifecycleState.resumed) {
       _loadAccountAndTransactions();
+      _loadRewards();
       _startAutoRefresh();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
@@ -137,6 +147,8 @@ class _HomeScreenState extends State<HomeScreen>
     await _loadAccountAndTransactions(
       silent: true,
     );
+
+    await _loadRewards();
   }
 
   // ============================================================
@@ -385,6 +397,41 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ============================================================
+  // CHARGEMENT RÉCOMPENSES
+  // ============================================================
+
+  Future<void> _loadRewards() async {
+    try {
+      final response = await _apiService.get(
+        '/api/rewards/wallet/${widget.userId}',
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = _apiService.decodeResponse(response);
+
+        if (data is Map) {
+          setState(() {
+            _rewardWallet = Map<String, dynamic>.from(data);
+            _isLoadingRewards = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        'Erreur chargement rewards : $e',
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoadingRewards = false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
   // CONVERSION TRANSACTION
   // ============================================================
 
@@ -562,6 +609,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _refreshTransactions() async {
     await _loadAccountAndTransactions();
+    await _loadRewards();
   }
 
   // ============================================================
@@ -718,6 +766,16 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
 
                     // ==================================================
+                    // RÉCOMPENSES
+                    // ==================================================
+
+                    _buildRewardsCard(isDark),
+
+                    const SizedBox(
+                      height: 28,
+                    ),
+
+                    // ==================================================
                     // TRANSACTIONS
                     // ==================================================
 
@@ -795,6 +853,147 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
       ),
+    );
+  }
+
+  // ============================================================
+  // CARTE RÉCOMPENSES
+  // ============================================================
+
+  Widget _buildRewardsCard(bool isDark) {
+    if (_isLoadingRewards) {
+      return const SizedBox.shrink();
+    }
+
+    final wallet = _rewardWallet;
+
+    if (wallet == null) {
+      return const SizedBox.shrink();
+    }
+
+    final points = wallet['pointsBalance'] ?? 0;
+
+    final pending =
+        (wallet['pendingAmountForPoints'] ?? 0).toString();
+
+    final cashback =
+        (wallet['totalCashback'] ?? 0).toString();
+
+    final billCount = wallet['billChallengeCount'] ?? 0;
+
+    final billTarget = wallet['billChallengeTarget'] ?? 5;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1A2340)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: isDark ? 0.20 : 0.05,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.card_giftcard_rounded,
+                color: Color(0xFFF4C542),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Mes récompenses',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: isDark
+                      ? Colors.white
+                      : const Color(0xFF1A2340),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
+            children: [
+              _rewardStat('⭐ Points', '$points'),
+              _rewardStat(
+                '💸 Progression',
+                '$pending / 10 DT',
+              ),
+              _rewardStat(
+                '💰 Cashback',
+                '$cashback DT',
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          Text(
+            '🧾 Factures : $billCount / $billTarget',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark
+                  ? Colors.white70
+                  : Colors.grey.shade700,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: (billCount as num) /
+                  (billTarget as num),
+              minHeight: 8,
+              backgroundColor: isDark
+                  ? Colors.white12
+                  : Colors.grey.shade200,
+              color: const Color(0xFF087A5B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rewardStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade500,
+          ),
+        ),
+      ],
     );
   }
 

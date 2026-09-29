@@ -990,9 +990,12 @@ void _selectRadarFine(
 
     try {
       final response =
-          await _apiService.post(
-        '/api/amendes/${fine.reference}/payer',
-      );
+    await _apiService.post(
+  '/api/amendes/${fine.reference}/payer',
+  body: {
+    'accountNumber': _accountNumber,
+  },
+);
 
       if (!mounted) return;
 
