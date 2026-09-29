@@ -163,88 +163,20 @@ class _CardsScreenState extends State<CardsScreen> {
 
     final cardId = card['id'];
 
-    bool isWithdrawing = false;
-
-    await showDialog<void>(
+    final result = await showDialog<_WithdrawalResult>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (
-            dialogContext,
-            setDialogState,
-          ) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(20),
-              ),
-              title: const Text(
-                'Retrait d’espèces',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              content: _buildWithdrawalContent(
-                context: dialogContext,
-                card: card,
-                controller: amountController,
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isWithdrawing
-                      ? null
-                      : () {
-                          Navigator.of(
-                            dialogContext,
-                          ).pop();
-                        },
-                  child: const Text(
-                    'Annuler',
-                  ),
-                ),
-                FilledButton(
-                  onPressed: isWithdrawing
-                      ? null
-                      : () async {
-                          await _withdraw(
-                            dialogContext:
-                                dialogContext,
-                            cardId: cardId,
-                            amountText:
-                                amountController.text,
-                            setIsWithdrawing:
-                                (value) {
-                              if (!dialogContext
-                                  .mounted) {
-                                return;
-                              }
-
-                              setDialogState(() {
-                                isWithdrawing =
-                                    value;
-                              });
-                            },
-                          );
-                        },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _green,
-                  ),
-                  child: isWithdrawing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child:
-                              CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Confirmer',
-                        ),
-                ),
-              ],
+        return _WithdrawalDialog(
+          card: card,
+          courantBalance: widget.courantBalance,
+          amountController: amountController,
+          onWithdraw: (
+            amountText,
+          ) async {
+            return _performWithdrawal(
+              cardId: cardId,
+              amountText: amountText,
             );
           },
         );
@@ -252,85 +184,32 @@ class _CardsScreenState extends State<CardsScreen> {
     );
 
     amountController.dispose();
+
+    if (!mounted) return;
+
+    if (result == null) {
+      return;
+    }
+
+    if (result.success) {
+      if (result.newBalance != null) {
+        widget.onCourantBalanceChanged
+            ?.call(result.newBalance!);
+      }
+
+      _showSnackBar(
+        'Retrait de ${result.amount.toStringAsFixed(3)} TND effectué avec succès.',
+      );
+    } else if (result.errorMessage != null) {
+      _showSnackBar(
+        result.errorMessage!,
+      );
+    }
   }
 
-  Widget _buildWithdrawalContent({
-    required BuildContext context,
-    required Map<String, dynamic> card,
-    required TextEditingController controller,
-  }) {
-    final textColor = Theme.of(context)
-        .textTheme
-        .bodyMedium
-        ?.color
-        ?.withValues(alpha: 0.65);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${card['cardType']} •••• ${card['lastFourDigits']}',
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Compte courant associé',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Solde disponible',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          '${widget.courantBalance.toStringAsFixed(3)} TND',
-          style: const TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            color: _blue,
-          ),
-        ),
-        const SizedBox(height: 18),
-        TextField(
-          controller: controller,
-          keyboardType:
-              const TextInputType.numberWithOptions(
-            decimal: true,
-          ),
-          decoration: InputDecoration(
-            labelText: 'Montant du retrait',
-            hintText: 'Ex. 200',
-            suffixText: 'TND',
-            prefixIcon: const Icon(
-              Icons.payments_rounded,
-            ),
-            border: OutlineInputBorder(
-              borderRadius:
-                  BorderRadius.circular(14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _withdraw({
-    required BuildContext dialogContext,
+  Future<_WithdrawalResult> _performWithdrawal({
     required dynamic cardId,
     required String amountText,
-    required ValueChanged<bool>
-        setIsWithdrawing,
   }) async {
     final rawAmount =
         amountText.trim().replaceAll(',', '.');
@@ -339,30 +218,16 @@ class _CardsScreenState extends State<CardsScreen> {
         double.tryParse(rawAmount);
 
     if (amount == null || amount <= 0) {
-      if (!dialogContext.mounted) return;
-
-      _showDialogSnackBar(
-        dialogContext,
+      return const _WithdrawalResult.failure(
         'Veuillez saisir un montant valide.',
       );
-
-      return;
     }
 
     if (amount > widget.courantBalance) {
-      if (!dialogContext.mounted) return;
-
-      _showDialogSnackBar(
-        dialogContext,
+      return const _WithdrawalResult.failure(
         'Solde insuffisant.',
       );
-
-      return;
     }
-
-    if (!dialogContext.mounted) return;
-
-    setIsWithdrawing(true);
 
     try {
       final response =
@@ -376,7 +241,7 @@ class _CardsScreenState extends State<CardsScreen> {
 
       if (response.statusCode < 200 ||
           response.statusCode >= 300) {
-        throw Exception(
+        return _WithdrawalResult.failure(
           _apiService.getErrorMessage(
             response,
           ),
@@ -395,29 +260,12 @@ class _CardsScreenState extends State<CardsScreen> {
         );
       }
 
-      if (!dialogContext.mounted) return;
-
-      Navigator.of(dialogContext).pop();
-
-      if (!mounted) return;
-
-      if (newBalance != null) {
-        widget.onCourantBalanceChanged
-            ?.call(newBalance);
-      }
-
-      _showSnackBar(
-        'Retrait de ${amount.toStringAsFixed(3)} TND effectué avec succès.',
+      return _WithdrawalResult.success(
+        amount: amount,
+        newBalance: newBalance,
       );
     } catch (error) {
-      if (!mounted) return;
-
-      if (!dialogContext.mounted) return;
-
-      setIsWithdrawing(false);
-
-      _showDialogSnackBar(
-        dialogContext,
+      return _WithdrawalResult.failure(
         _extractError(error),
       );
     }
@@ -520,28 +368,6 @@ class _CardsScreenState extends State<CardsScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
-  }
-
-  void _showDialogSnackBar(
-    BuildContext dialogContext,
-    String message,
-  ) {
-    if (!dialogContext.mounted) return;
-
-    final messenger =
-        ScaffoldMessenger.maybeOf(
-      dialogContext,
-    );
-
-    if (messenger == null) return;
-
-    messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
@@ -1585,6 +1411,309 @@ class _CardsScreenState extends State<CardsScreen> {
             fontWeight:
                 FontWeight.w600,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// RÉSULTAT DU RETRAIT
+// ============================================================================
+
+class _WithdrawalResult {
+  final bool success;
+  final double amount;
+  final double? newBalance;
+  final String? errorMessage;
+
+  const _WithdrawalResult({
+    required this.success,
+    required this.amount,
+    this.newBalance,
+    this.errorMessage,
+  });
+
+  const _WithdrawalResult.success({
+    required double amount,
+    double? newBalance,
+  }) : this(
+          success: true,
+          amount: amount,
+          newBalance: newBalance,
+        );
+
+  const _WithdrawalResult.failure(
+    String message,
+  ) : this(
+          success: false,
+          amount: 0,
+          errorMessage: message,
+        );
+}
+
+// ============================================================================
+// DIALOGUE DE RETRAIT
+// ============================================================================
+
+class _WithdrawalDialog extends StatefulWidget {
+  final Map<String, dynamic> card;
+  final double courantBalance;
+  final TextEditingController amountController;
+  final Future<_WithdrawalResult> Function(
+    String amountText,
+  ) onWithdraw;
+
+  const _WithdrawalDialog({
+    required this.card,
+    required this.courantBalance,
+    required this.amountController,
+    required this.onWithdraw,
+  });
+
+  @override
+  State<_WithdrawalDialog> createState() =>
+      _WithdrawalDialogState();
+}
+
+class _WithdrawalDialogState
+    extends State<_WithdrawalDialog> {
+  bool _isWithdrawing = false;
+
+  // ==========================================================================
+  // CONFIRMATION DU RETRAIT
+  // ==========================================================================
+
+  Future<void> _confirmWithdrawal() async {
+    if (_isWithdrawing) {
+      return;
+    }
+
+    final rawAmount =
+        widget.amountController.text
+            .trim()
+            .replaceAll(',', '.');
+
+    final amount =
+        double.tryParse(rawAmount);
+
+    if (amount == null || amount <= 0) {
+      _showError(
+        'Veuillez saisir un montant valide.',
+      );
+      return;
+    }
+
+    if (amount > widget.courantBalance) {
+      _showError(
+        'Solde insuffisant.',
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isWithdrawing = true;
+    });
+
+    final result =
+        await widget.onWithdraw(
+      widget.amountController.text,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result.success) {
+      Navigator.of(context).pop(
+        result,
+      );
+      return;
+    }
+
+    setState(() {
+      _isWithdrawing = false;
+    });
+
+    if (result.errorMessage != null) {
+      _showError(
+        result.errorMessage!,
+      );
+    }
+  }
+
+  // ==========================================================================
+  // MESSAGE D'ERREUR DANS LE DIALOGUE
+  // ==========================================================================
+
+  void _showError(
+    String message,
+  ) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // BUILD
+  // ==========================================================================
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    final theme =
+        Theme.of(context);
+
+    final textColor = theme
+        .textTheme
+        .bodyMedium
+        ?.color
+        ?.withValues(
+      alpha: 0.65,
+    );
+
+    final cardType =
+        widget.card['cardType']
+                ?.toString() ??
+            'Carte bancaire';
+
+    final lastFour =
+        widget.card['lastFourDigits']
+                ?.toString() ??
+            '0000';
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.circular(20),
+      ),
+      title: const Text(
+        'Retrait d’espèces',
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$cardType •••• $lastFour',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Compte courant associé',
+            style: TextStyle(
+              color: textColor,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Solde disponible',
+            style: TextStyle(
+              color: textColor,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${widget.courantBalance.toStringAsFixed(3)} TND',
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0B5AA6),
+            ),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller:
+                widget.amountController,
+            enabled: !_isWithdrawing,
+            keyboardType:
+                const TextInputType
+                    .numberWithOptions(
+              decimal: true,
+            ),
+            decoration:
+                InputDecoration(
+              labelText:
+                  'Montant du retrait',
+              hintText:
+                  'Ex. 200',
+              suffixText:
+                  'TND',
+              prefixIcon:
+                  const Icon(
+                Icons
+                    .payments_rounded,
+              ),
+              border:
+                  OutlineInputBorder(
+                borderRadius:
+                    BorderRadius.circular(
+                  14,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed:
+              _isWithdrawing
+                  ? null
+                  : () {
+                      Navigator.of(
+                        context,
+                      ).pop();
+                    },
+          child:
+              const Text(
+            'Annuler',
+          ),
+        ),
+        FilledButton(
+          onPressed:
+              _isWithdrawing
+                  ? null
+                  : _confirmWithdrawal,
+          style:
+              FilledButton.styleFrom(
+            backgroundColor:
+                const Color(0xFF087A5B),
+          ),
+          child: _isWithdrawing
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child:
+                      CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  'Confirmer',
+                ),
         ),
       ],
     );

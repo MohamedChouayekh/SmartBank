@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "notifications")
@@ -81,7 +82,9 @@ public class Notification {
     protected void onCreate() {
 
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = LocalDateTime.now(
+                    ZoneId.of("Africa/Tunis")
+            );
         }
     }
 

@@ -27,9 +27,7 @@ class _NotificationsScreenState
   final ApiService _apiService = ApiService();
 
   static const Color blue = Color(0xFF0B5AA6);
-
   static const Color darkBlue = Color(0xFF06457E);
-
   static const Color green = Color(0xFF087A5B);
 
   bool _isLoading = true;
@@ -225,6 +223,68 @@ class _NotificationsScreenState
   }
 
   // =========================================================
+  // DATE / HEURE DES NOTIFICATIONS
+  // =========================================================
+  //
+  // Le backend utilise LocalDateTime et renvoie par exemple :
+  //
+  // 2026-09-21T13:28:00
+  //
+  // Cette valeur ne contient pas de fuseau horaire.
+  //
+  // Dans SmartBank, on la considère comme une date/heure UTC,
+  // puis on la convertit vers l'heure locale du téléphone.
+  //
+  // Cela permet d'obtenir par exemple :
+  //
+  // Backend : 13:28 UTC
+  // Tunisie  : 14:28
+  //
+  // =========================================================
+
+  DateTime? _parseNotificationDate(
+    dynamic value,
+  ) {
+    if (value == null) {
+      return null;
+    }
+
+    final raw = value.toString().trim();
+
+    if (raw.isEmpty) {
+      return null;
+    }
+
+    try {
+      final parsed = DateTime.parse(raw);
+
+      // DateTime.parse("2026-09-21T13:28:00")
+      // crée un DateTime sans information de fuseau.
+      //
+      // On reconstruit donc explicitement la même date/heure
+      // en UTC avant de la convertir vers l'heure locale.
+      final utc = DateTime.utc(
+        parsed.year,
+        parsed.month,
+        parsed.day,
+        parsed.hour,
+        parsed.minute,
+        parsed.second,
+        parsed.millisecond,
+        parsed.microsecond,
+      );
+
+      return utc.toLocal();
+    } catch (e) {
+      debugPrint(
+        'Erreur parsing date notification : $raw - $e',
+      );
+
+      return null;
+    }
+  }
+
+  // =========================================================
   // NOTIFICATIONS
   // =========================================================
 
@@ -256,19 +316,23 @@ class _NotificationsScreenState
         }
       }
 
+      // =====================================================
+      // TRI PAR DATE
+      // =====================================================
+
       loaded.sort(
         (a, b) {
           final aDate =
-              DateTime.tryParse(
-                (a['createdAt'] ?? '').toString(),
-              ) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+              _parseNotificationDate(
+                    a['createdAt'],
+                  ) ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
 
           final bDate =
-              DateTime.tryParse(
-                (b['createdAt'] ?? '').toString(),
-              ) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+              _parseNotificationDate(
+                    b['createdAt'],
+                  ) ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
 
           return bDate.compareTo(aDate);
         },
@@ -514,7 +578,7 @@ class _NotificationsScreenState
   }
 
   // =========================================================
-  // NOUVEAU : ÉTAT DE LA CATÉGORIE
+  // ÉTAT DE LA CATÉGORIE
   // =========================================================
 
   bool _isCategoryEnabled(
@@ -543,7 +607,7 @@ class _NotificationsScreenState
   }
 
   // =========================================================
-  // NOUVEAU : MESSAGE CATÉGORIE DÉSACTIVÉE
+  // MESSAGE CATÉGORIE DÉSACTIVÉE
   // =========================================================
 
   String _getCategoryDisabledMessage(
@@ -653,8 +717,12 @@ class _NotificationsScreenState
 
     final read = notification['read'] == true;
 
-    final date = DateTime.tryParse(
-      (notification['createdAt'] ?? '').toString(),
+    // =======================================================
+    // DATE CORRIGÉE
+    // =======================================================
+
+    final date = _parseNotificationDate(
+      notification['createdAt'],
     );
 
     final color = _getNotificationColor(type);
@@ -766,10 +834,6 @@ class _NotificationsScreenState
                             ),
                       ),
                     ),
-
-                    // =================================================
-                    // MONTANT DU VIREMENT ENTRANT
-                    // =================================================
                     if (isTransferIn &&
                         amount != null)
                       Padding(
@@ -785,7 +849,6 @@ class _NotificationsScreenState
                           ),
                         ),
                       ),
-
                     if (date != null)
                       Padding(
                         padding: const EdgeInsets.only(
@@ -1119,25 +1182,23 @@ class _NotificationsScreenState
   String _formatDate(
     DateTime date,
   ) {
-    final local = date.toLocal();
-
-    final day = local.day
+    final day = date.day
         .toString()
         .padLeft(2, '0');
 
-    final month = local.month
+    final month = date.month
         .toString()
         .padLeft(2, '0');
 
-    final hour = local.hour
+    final hour = date.hour
         .toString()
         .padLeft(2, '0');
 
-    final minute = local.minute
+    final minute = date.minute
         .toString()
         .padLeft(2, '0');
 
-    return '$day/$month/${local.year} • $hour:$minute';
+    return '$day/$month/${date.year} • $hour:$minute';
   }
 
   // =========================================================
@@ -1297,210 +1358,7 @@ class _NotificationsScreenState
                     ),
 
                     // =================================================
-                    // PRÉFÉRENCES
-                    // =================================================
-
-                    Text(
-                      'Préférences',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(
-                            fontWeight:
-                                FontWeight.w800,
-                          ),
-                    ),
-
-                    const SizedBox(
-                      height: 6,
-                    ),
-
-                    Text(
-                      'Activez les notifications générales pour afficher les notifications sélectionnées ci-dessous.',
-                      style: TextStyle(
-                        color: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.color
-                            ?.withValues(
-                              alpha: 0.68,
-                            ),
-                        fontSize: 12.5,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 14,
-                    ),
-
-                    // =================================================
-                    // GÉNÉRAL
-                    // =================================================
-
-                    _buildSwitch(
-                      title:
-                          'Notifications générales',
-                      subtitle:
-                          'Autoriser l’affichage des notifications SmartBank.',
-                      icon: Icons
-                          .notifications_active_outlined,
-                      value:
-                          _generalNotifications,
-                      onChanged: (value) {
-                        setState(() {
-                          _generalNotifications =
-                              value;
-                        });
-
-                        _savePreferences();
-                      },
-                    ),
-
-                    // =================================================
-                    // SI GÉNÉRAL OFF
-                    // =================================================
-
-                    if (!_generalNotifications)
-                      Container(
-                        width: double.infinity,
-                        margin:
-                            const EdgeInsets.only(
-                          top: 4,
-                          bottom: 20,
-                        ),
-                        padding:
-                            const EdgeInsets.all(
-                          16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(
-                                  0xFF2A2117,
-                                )
-                              : const Color(
-                                  0xFFFFF7E8,
-                                ),
-                          borderRadius:
-                              BorderRadius.circular(
-                            17,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons
-                                  .notifications_off_rounded,
-                              color:
-                                  Colors.orange,
-                            ),
-                            const SizedBox(
-                              width: 10,
-                            ),
-                            const Expanded(
-                              child: Text(
-                                'Les notifications sont désactivées. Elles restent enregistrées dans SmartBank.',
-                                style:
-                                    TextStyle(
-                                  fontSize:
-                                      12.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // =================================================
-                    // SI GÉNÉRAL ON
-                    // =================================================
-
-                    if (_generalNotifications) ...[
-                      const SizedBox(
-                        height: 10,
-                      ),
-
-                      Text(
-                        'Notifications',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
-                              fontWeight:
-                                  FontWeight.w800,
-                            ),
-                      ),
-
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      // -----------------------------------------------
-                      // TOUTES
-                      // -----------------------------------------------
-
-                      _buildGeneralSection(),
-
-                      const SizedBox(
-                        height: 24,
-                      ),
-
-                      // -----------------------------------------------
-                      // VIREMENTS
-                      // -----------------------------------------------
-
-                      _buildCategorySection(
-                        title: 'Virements',
-                        type: 'TRANSFER',
-                        icon: Icons.swap_horiz_rounded,
-                      ),
-
-                      // -----------------------------------------------
-                      // PAIEMENTS
-                      // -----------------------------------------------
-
-                      _buildCategorySection(
-                        title: 'Paiements',
-                        type: 'PAYMENT',
-                        icon: Icons.payment_rounded,
-                      ),
-
-                      // -----------------------------------------------
-                      // RETRAITS
-                      // -----------------------------------------------
-
-                      _buildCategorySection(
-                        title: 'Retraits',
-                        type: 'WITHDRAWAL',
-                        icon: Icons.atm_rounded,
-                      ),
-
-                      // -----------------------------------------------
-                      // SÉCURITÉ
-                      // -----------------------------------------------
-
-                      _buildCategorySection(
-                        title: 'Sécurité',
-                        type: 'SECURITY',
-                        icon: Icons.security_rounded,
-                      ),
-
-                      // -----------------------------------------------
-                      // PROMOTIONS
-                      // -----------------------------------------------
-
-                      _buildCategorySection(
-                        title: 'Promotions',
-                        type: 'PROMOTION',
-                        icon: Icons.local_offer_rounded,
-                      ),
-                    ],
-
-                    const SizedBox(
-                      height: 20,
-                    ),
-
-                    // =================================================
-                    // INTERRUPTEURS DES CATÉGORIES
+                    // CATÉGORIES
                     // =================================================
 
                     Text(
@@ -1614,6 +1472,185 @@ class _NotificationsScreenState
                         _savePreferences();
                       },
                     ),
+
+                    const SizedBox(
+                      height: 24,
+                    ),
+
+                    // =================================================
+                    // PRÉFÉRENCES
+                    // =================================================
+
+                    Text(
+                      'Préférences',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(
+                            fontWeight:
+                                FontWeight.w800,
+                          ),
+                    ),
+
+                    const SizedBox(
+                      height: 6,
+                    ),
+
+                    Text(
+                      'Activez les notifications générales pour afficher les notifications sélectionnées ci-dessous.',
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withValues(
+                              alpha: 0.68,
+                            ),
+                        fontSize: 12.5,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: 14,
+                    ),
+
+                    // =================================================
+                    // NOTIFICATIONS GÉNÉRALES
+                    // =================================================
+
+                    _buildSwitch(
+                      title:
+                          'Notifications générales',
+                      subtitle:
+                          'Autoriser l’affichage des notifications SmartBank.',
+                      icon: Icons
+                          .notifications_active_outlined,
+                      value:
+                          _generalNotifications,
+                      onChanged: (value) {
+                        setState(() {
+                          _generalNotifications =
+                              value;
+                        });
+
+                        _savePreferences();
+                      },
+                    ),
+
+                    // =================================================
+                    // SI GÉNÉRAL OFF
+                    // =================================================
+
+                    if (!_generalNotifications)
+                      Container(
+                        width: double.infinity,
+                        margin:
+                            const EdgeInsets.only(
+                          top: 4,
+                          bottom: 20,
+                        ),
+                        padding:
+                            const EdgeInsets.all(
+                          16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(
+                                  0xFF2A2117,
+                                )
+                              : const Color(
+                                  0xFFFFF7E8,
+                                ),
+                          borderRadius:
+                              BorderRadius.circular(
+                            17,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons
+                                  .notifications_off_rounded,
+                              color:
+                                  Colors.orange,
+                            ),
+                            const SizedBox(
+                              width: 10,
+                            ),
+                            const Expanded(
+                              child: Text(
+                                'Les notifications sont désactivées. Elles restent enregistrées dans SmartBank.',
+                                style:
+                                    TextStyle(
+                                  fontSize:
+                                      12.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // =================================================
+                    // SI GÉNÉRAL ON
+                    // =================================================
+
+                    if (_generalNotifications) ...[
+                      const SizedBox(
+                        height: 10,
+                      ),
+
+                      Text(
+                        'Notifications',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(
+                              fontWeight:
+                                  FontWeight.w800,
+                            ),
+                      ),
+
+                      const SizedBox(
+                        height: 12,
+                      ),
+
+                      _buildGeneralSection(),
+
+                      const SizedBox(
+                        height: 24,
+                      ),
+
+                      _buildCategorySection(
+                        title: 'Virements',
+                        type: 'TRANSFER',
+                        icon: Icons.swap_horiz_rounded,
+                      ),
+
+                      _buildCategorySection(
+                        title: 'Paiements',
+                        type: 'PAYMENT',
+                        icon: Icons.payment_rounded,
+                      ),
+
+                      _buildCategorySection(
+                        title: 'Retraits',
+                        type: 'WITHDRAWAL',
+                        icon: Icons.atm_rounded,
+                      ),
+
+                      _buildCategorySection(
+                        title: 'Sécurité',
+                        type: 'SECURITY',
+                        icon: Icons.security_rounded,
+                      ),
+
+                      _buildCategorySection(
+                        title: 'Promotions',
+                        type: 'PROMOTION',
+                        icon: Icons.local_offer_rounded,
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -9,26 +9,36 @@ class CreateAccountScreen extends StatefulWidget {
   });
 
   @override
-  State<CreateAccountScreen> createState() => _CreateAccountScreenState();
+  State<CreateAccountScreen> createState() =>
+      _CreateAccountScreenState();
 }
 
-class _CreateAccountScreenState extends State<CreateAccountScreen> {
+class _CreateAccountScreenState
+    extends State<CreateAccountScreen> {
+
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController firstNameController =
       TextEditingController();
+
   final TextEditingController lastNameController =
       TextEditingController();
+
   final TextEditingController emailController =
       TextEditingController();
+
   final TextEditingController phoneController =
       TextEditingController();
+
   final TextEditingController usernameController =
       TextEditingController();
+
   final TextEditingController addressController =
       TextEditingController();
+
   final TextEditingController passwordController =
       TextEditingController();
+
   final TextEditingController confirmPasswordController =
       TextEditingController();
 
@@ -95,7 +105,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       return 'Veuillez entrer votre adresse email.';
     }
 
-    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    final emailRegex =
+        RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
     if (!emailRegex.hasMatch(text)) {
       return 'Veuillez entrer une adresse email valide.';
@@ -133,7 +144,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       return 'L’identifiant ne doit pas dépasser 20 caractères.';
     }
 
-    if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9]*$').hasMatch(text)) {
+    if (!RegExp(
+      r'^[a-zA-Z][a-zA-Z0-9]*$',
+    ).hasMatch(text)) {
       return 'Commencez par une lettre et utilisez uniquement des lettres et chiffres.';
     }
 
@@ -181,7 +194,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       return 'Le mot de passe doit contenir un chiffre.';
     }
 
-    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+\[\]\\\/]').hasMatch(text)) {
+    if (!RegExp(
+      r'[!@#$%^&*(),.?":{}|<>_\-+\[\]\\\/]',
+    ).hasMatch(text)) {
       return 'Le mot de passe doit contenir un caractère spécial.';
     }
 
@@ -200,34 +215,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     }
 
     return null;
-  }
-
-  Future<void> _createBankAccounts(int userId) async {
-    final types = ['CURRENT', 'SAVINGS'];
-
-    for (final type in types) {
-      try {
-        final response = await _apiService.post(
-          '/api/accounts',
-          body: {
-            'userId': userId,
-            'type': type,
-          },
-        );
-
-        debugPrint(
-          'Création compte $type : ${response.statusCode}',
-        );
-
-        debugPrint(
-          'Réponse compte $type : ${response.body}',
-        );
-      } catch (e) {
-        debugPrint(
-          'Erreur création compte $type : $e',
-        );
-      }
-    }
   }
 
   Future<void> _createAccount() async {
@@ -284,13 +271,27 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       debugPrint(
         'URL: ${ApiService.baseUrl}/api/users',
       );
-      debugPrint('username: ${requestBody['username']}');
-      debugPrint('email: ${requestBody['email']}');
-      debugPrint('fullName: ${requestBody['fullName']}');
-      debugPrint('phoneNumber: ${requestBody['phoneNumber']}');
-      debugPrint('address: ${requestBody['address']}');
-      debugPrint('password présent: ${password.isNotEmpty}');
-      debugPrint('password length: ${password.length}');
+      debugPrint(
+        'username: ${requestBody['username']}',
+      );
+      debugPrint(
+        'email: ${requestBody['email']}',
+      );
+      debugPrint(
+        'fullName: ${requestBody['fullName']}',
+      );
+      debugPrint(
+        'phoneNumber: ${requestBody['phoneNumber']}',
+      );
+      debugPrint(
+        'address: ${requestBody['address']}',
+      );
+      debugPrint(
+        'password présent: ${password.isNotEmpty}',
+      );
+      debugPrint(
+        'password length: ${password.length}',
+      );
       debugPrint('==============================');
 
       final response = await _apiService.post(
@@ -312,7 +313,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
       if (response.statusCode == 200 ||
           response.statusCode == 201) {
-        final decoded = _apiService.decodeResponse(response);
+
+        final decoded =
+            _apiService.decodeResponse(response);
 
         if (decoded is! Map) {
           throw Exception(
@@ -328,25 +331,28 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
         final User user = User(
           id: newUserId,
-          firstName: firstNameController.text.trim(),
-          lastName: lastNameController.text.trim(),
-          email: (data['email'] ?? '').toString(),
-          phone: (data['phoneNumber'] ?? '').toString(),
-          username: (data['username'] ?? '').toString(),
-          address: (data['address'] ?? '').toString().trim(),
+          firstName:
+              firstNameController.text.trim(),
+          lastName:
+              lastNameController.text.trim(),
+          email:
+              (data['email'] ?? '').toString(),
+          phone:
+              (data['phoneNumber'] ?? '').toString(),
+          username:
+              (data['username'] ?? '').toString(),
+          address:
+              (data['address'] ?? '')
+                  .toString()
+                  .trim(),
         );
-
-        await _createBankAccounts(newUserId);
-
-        if (!mounted) {
-          return;
-        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Compte créé avec succès.',
+              'Compte créé avec succès. Votre compte bancaire et votre carte VISA ont été créés automatiquement.',
             ),
+            duration: Duration(seconds: 4),
           ),
         );
 
@@ -451,14 +457,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   maxWidth: 500,
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
+
                     Center(
                       child: Container(
                         width: 75,
                         height: 75,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
+                          color:
+                              theme.colorScheme.primary,
                           borderRadius:
                               BorderRadius.circular(22),
                         ),
@@ -476,9 +485,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       child: Text(
                         'Bienvenue chez SmartBank',
                         textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineSmall
+                        style: theme
+                            .textTheme
+                            .headlineSmall
                             ?.copyWith(
-                          fontWeight: FontWeight.bold,
+                          fontWeight:
+                              FontWeight.bold,
                         ),
                       ),
                     ),
@@ -488,8 +500,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     Center(
                       child: Text(
                         'Créez votre compte pour accéder à vos services bancaires.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium,
+                        textAlign:
+                            TextAlign.center,
+                        style:
+                            theme.textTheme.bodyMedium,
                       ),
                     ),
 
@@ -497,90 +511,116 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                     Text(
                       'Informations personnelles',
-                      style: theme.textTheme.titleMedium
+                      style: theme
+                          .textTheme
+                          .titleMedium
                           ?.copyWith(
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                            FontWeight.bold,
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     TextFormField(
-                      controller: firstNameController,
+                      controller:
+                          firstNameController,
                       textCapitalization:
                           TextCapitalization.words,
                       textInputAction:
                           TextInputAction.next,
-                      validator: _validateFirstName,
-                      decoration: _inputDecoration(
+                      validator:
+                          _validateFirstName,
+                      decoration:
+                          _inputDecoration(
                         label: 'Prénom',
                         hint: 'Ex. Mohamed',
-                        icon: Icons.person_outline,
+                        icon:
+                            Icons.person_outline,
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     TextFormField(
-                      controller: lastNameController,
+                      controller:
+                          lastNameController,
                       textCapitalization:
                           TextCapitalization.words,
                       textInputAction:
                           TextInputAction.next,
-                      validator: _validateLastName,
-                      decoration: _inputDecoration(
+                      validator:
+                          _validateLastName,
+                      decoration:
+                          _inputDecoration(
                         label: 'Nom',
                         hint: 'Ex. Chouayekh',
-                        icon: Icons.badge_outlined,
+                        icon:
+                            Icons.badge_outlined,
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     TextFormField(
-                      controller: emailController,
+                      controller:
+                          emailController,
                       keyboardType:
                           TextInputType.emailAddress,
                       textInputAction:
                           TextInputAction.next,
-                      validator: _validateEmail,
-                      decoration: _inputDecoration(
+                      validator:
+                          _validateEmail,
+                      decoration:
+                          _inputDecoration(
                         label: 'Email',
-                        hint: 'exemple@email.com',
-                        icon: Icons.email_outlined,
+                        hint:
+                            'exemple@email.com',
+                        icon:
+                            Icons.email_outlined,
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     TextFormField(
-                      controller: phoneController,
-                      keyboardType: TextInputType.phone,
+                      controller:
+                          phoneController,
+                      keyboardType:
+                          TextInputType.phone,
                       maxLength: 8,
                       textInputAction:
                           TextInputAction.next,
-                      validator: _validatePhone,
-                      decoration: _inputDecoration(
+                      validator:
+                          _validatePhone,
+                      decoration:
+                          _inputDecoration(
                         label: 'Téléphone',
                         hint: 'Ex. 98123456',
-                        icon: Icons.phone_outlined,
+                        icon:
+                            Icons.phone_outlined,
                       ),
                     ),
 
                     const SizedBox(height: 8),
 
                     TextFormField(
-                      controller: addressController,
+                      controller:
+                          addressController,
                       textCapitalization:
                           TextCapitalization.sentences,
                       textInputAction:
                           TextInputAction.next,
-                      validator: _validateAddress,
+                      validator:
+                          _validateAddress,
                       maxLines: 2,
-                      decoration: _inputDecoration(
+                      decoration:
+                          _inputDecoration(
                         label: 'Adresse',
-                        hint: 'Ex. Sfax, Tunisie',
-                        icon: Icons.location_on_outlined,
+                        hint:
+                            'Ex. Sfax, Tunisie',
+                        icon: Icons
+                            .location_on_outlined,
                       ),
                     ),
 
@@ -588,9 +628,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                     Text(
                       'Identifiants de connexion',
-                      style: theme.textTheme.titleMedium
+                      style: theme
+                          .textTheme
+                          .titleMedium
                           ?.copyWith(
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                            FontWeight.bold,
                       ),
                     ),
 
@@ -598,39 +641,50 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                     Text(
                       'Votre identifiant doit commencer par une lettre et contenir uniquement des lettres et chiffres.',
-                      style: theme.textTheme.bodySmall,
+                      style:
+                          theme.textTheme.bodySmall,
                     ),
 
                     const SizedBox(height: 16),
 
                     TextFormField(
-                      controller: usernameController,
+                      controller:
+                          usernameController,
                       textInputAction:
                           TextInputAction.next,
-                      validator: _validateUsername,
-                      decoration: _inputDecoration(
+                      validator:
+                          _validateUsername,
+                      decoration:
+                          _inputDecoration(
                         label: 'Identifiant',
-                        hint: 'Ex. Mohamed123',
-                        icon:
-                            Icons.account_circle_outlined,
+                        hint:
+                            'Ex. Mohamed123',
+                        icon: Icons
+                            .account_circle_outlined,
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     TextFormField(
-                      controller: passwordController,
-                      obscureText: _obscurePassword,
+                      controller:
+                          passwordController,
+                      obscureText:
+                          _obscurePassword,
                       textInputAction:
                           TextInputAction.next,
-                      validator: _validatePassword,
-                      decoration: _inputDecoration(
+                      validator:
+                          _validatePassword,
+                      decoration:
+                          _inputDecoration(
                         label: 'Mot de passe',
                         hint:
                             'Entrez un mot de passe sécurisé',
-                        icon: Icons.lock_outline,
+                        icon:
+                            Icons.lock_outline,
                       ).copyWith(
-                        suffixIcon: IconButton(
+                        suffixIcon:
+                            IconButton(
                           onPressed: () {
                             setState(() {
                               _obscurePassword =
@@ -639,8 +693,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           },
                           icon: Icon(
                             _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                                ? Icons
+                                    .visibility_outlined
+                                : Icons
+                                    .visibility_off_outlined,
                           ),
                         ),
                       ),
@@ -659,14 +715,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           _validateConfirmPassword,
                       onFieldSubmitted:
                           (_) => _createAccount(),
-                      decoration: _inputDecoration(
+                      decoration:
+                          _inputDecoration(
                         label:
                             'Confirmer le mot de passe',
                         hint:
                             'Répétez votre mot de passe',
-                        icon: Icons.lock_reset_outlined,
+                        icon:
+                            Icons.lock_reset_outlined,
                       ).copyWith(
-                        suffixIcon: IconButton(
+                        suffixIcon:
+                            IconButton(
                           onPressed: () {
                             setState(() {
                               _obscureConfirmPassword =
@@ -675,8 +734,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           },
                           icon: Icon(
                             _obscureConfirmPassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                                ? Icons
+                                    .visibility_outlined
+                                : Icons
+                                    .visibility_off_outlined,
                           ),
                         ),
                       ),
@@ -686,9 +747,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme
+                      padding:
+                          const EdgeInsets.all(16),
+                      decoration:
+                          BoxDecoration(
+                        color: theme
+                            .colorScheme
                             .surfaceContainerHighest,
                         borderRadius:
                             BorderRadius.circular(14),
@@ -697,24 +761,39 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         crossAxisAlignment:
                             CrossAxisAlignment.start,
                         children: [
+
                           Text(
                             'Le mot de passe doit contenir :',
-                            style: theme.textTheme.titleSmall
+                            style: theme
+                                .textTheme
+                                .titleSmall
                                 ?.copyWith(
                               fontWeight:
                                   FontWeight.bold,
                             ),
                           ),
+
                           const SizedBox(height: 8),
+
                           const Text(
-                              '• Au moins 8 caractères'),
+                            '• Au moins 8 caractères',
+                          ),
+
                           const Text(
-                              '• Une lettre majuscule'),
+                            '• Une lettre majuscule',
+                          ),
+
                           const Text(
-                              '• Une lettre minuscule'),
-                          const Text('• Un chiffre'),
+                            '• Une lettre minuscule',
+                          ),
+
                           const Text(
-                              '• Un caractère spécial'),
+                            '• Un chiffre',
+                          ),
+
+                          const Text(
+                            '• Un caractère spécial',
+                          ),
                         ],
                       ),
                     ),
@@ -724,7 +803,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     SizedBox(
                       width: double.infinity,
                       height: 54,
-                      child: ElevatedButton.icon(
+                      child:
+                          ElevatedButton.icon(
                         onPressed: _isLoading
                             ? null
                             : _createAccount,
@@ -744,9 +824,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           _isLoading
                               ? 'Création en cours...'
                               : 'Créer mon compte',
-                          style: const TextStyle(
+                          style:
+                              const TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontWeight:
+                                FontWeight.bold,
                           ),
                         ),
                         style:
@@ -754,7 +836,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           shape:
                               RoundedRectangleBorder(
                             borderRadius:
-                                BorderRadius.circular(14),
+                                BorderRadius.circular(
+                                    14),
                           ),
                         ),
                       ),
@@ -767,7 +850,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         onPressed: _isLoading
                             ? null
                             : () {
-                                Navigator.pop(context);
+                                Navigator.pop(
+                                    context);
                               },
                         child: const Text(
                           'J’ai déjà un compte',

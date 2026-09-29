@@ -21,10 +21,13 @@ public class TransactionService {
 
     private final NotificationService notificationService;
 
+    private final PromotionEngineService promotionEngineService;
+
     public TransactionService(
             TransactionRepository transactionRepository,
             AccountRepository accountRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            PromotionEngineService promotionEngineService) {
 
         this.transactionRepository =
                 transactionRepository;
@@ -34,6 +37,9 @@ public class TransactionService {
 
         this.notificationService =
                 notificationService;
+
+        this.promotionEngineService =
+                promotionEngineService;
     }
 
     // =========================================================
@@ -506,6 +512,10 @@ public class TransactionService {
             String reference,
             BigDecimal amount) {
 
+        // =====================================================
+        // VALIDATION DU MONTANT
+        // =====================================================
+
         if (amount == null ||
                 amount.compareTo(
                         BigDecimal.ZERO) <= 0) {
@@ -514,6 +524,10 @@ public class TransactionService {
                     "Le montant doit être supérieur à 0."
             );
         }
+
+        // =====================================================
+        // VALIDATION DU COMPTE
+        // =====================================================
 
         if (accountNumber == null ||
                 accountNumber.trim().isEmpty()) {
@@ -534,6 +548,29 @@ public class TransactionService {
                                 )
                         );
 
+        // =====================================================
+        // PAIEMENT UNIQUEMENT DEPUIS LE COMPTE COURANT
+        // =====================================================
+
+        String accountType =
+                account.getType() == null
+                        ? ""
+                        : account.getType()
+                        .trim()
+                        .toUpperCase();
+
+        if (!"CURRENT".equals(accountType)) {
+
+            throw new RuntimeException(
+                    "Les paiements sont uniquement autorisés "
+                            + "depuis le compte courant."
+            );
+        }
+
+        // =====================================================
+        // VÉRIFICATION DU SOLDE
+        // =====================================================
+
         if (account.getBalance()
                 .compareTo(amount) < 0) {
 
@@ -541,6 +578,10 @@ public class TransactionService {
                     "Solde insuffisant."
             );
         }
+
+        // =====================================================
+        // DÉBIT DU COMPTE
+        // =====================================================
 
         account.setBalance(
                 account.getBalance()
@@ -550,6 +591,10 @@ public class TransactionService {
         accountRepository.save(
                 account
         );
+
+        // =====================================================
+        // CRÉATION DE LA TRANSACTION
+        // =====================================================
 
         Transaction transaction =
                 new Transaction();
@@ -578,6 +623,10 @@ public class TransactionService {
                 transaction
         );
 
+        // =====================================================
+        // NOTIFICATION
+        // =====================================================
+
         notificationService.notifyPayment(
                 account.getUser().getId(),
                 "Paiement effectué",
@@ -588,6 +637,17 @@ public class TransactionService {
                         + " ("
                         + category
                         + ")."
+        );
+
+        // =====================================================
+        // MOTEUR PROMOTIONS
+        // =====================================================
+
+        promotionEngineService.evaluatePayment(
+                account,
+                category,
+                biller,
+                amount
         );
     }
 

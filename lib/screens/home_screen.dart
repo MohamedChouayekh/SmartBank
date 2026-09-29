@@ -1222,13 +1222,6 @@ class _HomeScreenState extends State<HomeScreen>
                   amount,
                   item,
                 ) {
-                  widget
-                      .onBalanceChanged
-                      ?.call(
-                    widget.balance -
-                        amount,
-                  );
-
                   _refreshTransactions();
                 },
               ),

@@ -60,31 +60,17 @@ class _MainNavigationState extends State<MainNavigation>
   // COULEURS SMARTBANK
   // =========================================================
 
-  // -----------------------------
-  // VIREMENT EXTERNE
-  // -----------------------------
-
   static const Color primaryBlue =
       Color(0xFF0B5AA6);
 
   static const Color darkBlue =
       Color(0xFF06457E);
 
-  // -----------------------------
-  // COURANT → ÉPARGNE
-  // VERT FONCÉ
-  // -----------------------------
-
   static const Color currentToSavingsGreen =
       Color(0xFF087A5B);
 
   static const Color currentToSavingsDarkGreen =
       Color(0xFF055B45);
-
-  // -----------------------------
-  // ÉPARGNE → COURANT
-  // VERT CLAIR
-  // -----------------------------
 
   static const Color savingsToCurrentGreen =
       Color(0xFF32B67A);
@@ -167,10 +153,6 @@ class _MainNavigationState extends State<MainNavigation>
     _epargneBalance =
         widget.initialEpargneBalance;
 
-    // ---------------------------------------------------------
-    // Animation
-    // ---------------------------------------------------------
-
     _notificationAnimationController =
         AnimationController(
       vsync: this,
@@ -214,20 +196,12 @@ class _MainNavigationState extends State<MainNavigation>
           Curves.easeIn,
     );
 
-    // ---------------------------------------------------------
-    // Session
-    // ---------------------------------------------------------
-
     _sessionInvalidationSubscription =
         DeviceSessionService
             .sessionInvalidatedStream
             .listen((_) {
       _handleSessionInvalidation();
     });
-
-    // ---------------------------------------------------------
-    // Notifications
-    // ---------------------------------------------------------
 
     _initializeNotifications();
   }
@@ -338,10 +312,6 @@ class _MainNavigationState extends State<MainNavigation>
       return;
     }
 
-    // =======================================================
-    // TRI PAR DATE DESCENDANTE
-    // =======================================================
-
     notifications.sort(
       (a, b) {
         final aDate =
@@ -368,24 +338,6 @@ class _MainNavigationState extends State<MainNavigation>
       },
     );
 
-    // =======================================================
-    // CHERCHER LE DERNIER VIREMENT À AFFICHER
-    //
-    // On accepte :
-    //
-    // 1. TRANSFER_IN
-    // 2. TRANSFER + "Virement reçu"
-    // 3. TRANSFER + transfert interne
-    //
-    // On ignore :
-    //
-    // 1. TRANSFER_OUT
-    // 2. TRANSFER + "Virement envoyé"
-    //
-    // Cela permet de gérer les anciennes notifications qui
-    // utilisent encore type = TRANSFER.
-    // =======================================================
-
     Map<String, dynamic>?
         latestTransfer;
 
@@ -397,17 +349,9 @@ class _MainNavigationState extends State<MainNavigation>
               .trim()
               .toUpperCase();
 
-      // =====================================================
-      // TRANSFERT SORTANT MODERNE
-      // =====================================================
-
       if (type == 'TRANSFER_OUT') {
         continue;
       }
-
-      // =====================================================
-      // TRANSFERT ENTRANT MODERNE
-      // =====================================================
 
       if (type == 'TRANSFER_IN') {
         latestTransfer =
@@ -415,15 +359,7 @@ class _MainNavigationState extends State<MainNavigation>
         break;
       }
 
-      // =====================================================
-      // ANCIEN FORMAT TRANSFER
-      // =====================================================
-
       if (type == 'TRANSFER') {
-        // -----------------------------------------------
-        // Virement reçu
-        // -----------------------------------------------
-
         if (_isIncomingTransfer(
           notification,
         )) {
@@ -432,10 +368,6 @@ class _MainNavigationState extends State<MainNavigation>
           break;
         }
 
-        // -----------------------------------------------
-        // Transfert entre ses propres comptes
-        // -----------------------------------------------
-
         if (_isInternalTransfer(
           notification,
         )) {
@@ -443,10 +375,6 @@ class _MainNavigationState extends State<MainNavigation>
               notification;
           break;
         }
-
-        // -----------------------------------------------
-        // Virement envoyé
-        // -----------------------------------------------
 
         if (_isOutgoingTransfer(
           notification,
@@ -460,10 +388,6 @@ class _MainNavigationState extends State<MainNavigation>
         null) {
       return;
     }
-
-    // =======================================================
-    // ID
-    // =======================================================
 
     final notificationId =
         int.tryParse(
@@ -500,15 +424,6 @@ class _MainNavigationState extends State<MainNavigation>
       'amount=${latestTransfer['amount']}',
     );
 
-    // =======================================================
-    // PREMIER CHARGEMENT
-    //
-    // On mémorise la dernière notification existante
-    // pour éviter d'afficher une ancienne notification.
-    //
-    // Si elle est encore non lue, elle peut être affichée.
-    // =======================================================
-
     if (initializeOnly) {
       _lastDisplayedNotificationId =
           notificationId;
@@ -537,24 +452,10 @@ class _MainNavigationState extends State<MainNavigation>
       return;
     }
 
-    // =======================================================
-    // NOTIFICATION DÉJÀ AFFICHÉE
-    // =======================================================
-
     if (_lastDisplayedNotificationId ==
         notificationId) {
       return;
     }
-
-    // =======================================================
-    // NOUVELLE NOTIFICATION
-    //
-    // IMPORTANT :
-    // On ne vérifie PAS read == false ici.
-    //
-    // L'ID permet de détecter une nouvelle notification même
-    // si elle a déjà été marquée comme lue.
-    // =======================================================
 
     debugPrint(
       '[NOTIFICATIONS] '
@@ -591,14 +492,6 @@ class _MainNavigationState extends State<MainNavigation>
 
   // =========================================================
   // DÉTECTER VIREMENT ENTRANT
-  //
-  // Compatible avec :
-  //
-  // TRANSFER_IN
-  //
-  // et ancien format :
-  //
-  // TRANSFER + Virement reçu
   // =========================================================
 
   bool _isIncomingTransfer(
@@ -660,14 +553,6 @@ class _MainNavigationState extends State<MainNavigation>
 
   // =========================================================
   // DÉTECTER VIREMENT SORTANT
-  //
-  // Compatible avec :
-  //
-  // TRANSFER_OUT
-  //
-  // et ancien format :
-  //
-  // TRANSFER + Virement envoyé
   // =========================================================
 
   bool _isOutgoingTransfer(
@@ -759,10 +644,6 @@ class _MainNavigationState extends State<MainNavigation>
         decoded,
       );
 
-      // =====================================================
-      // GÉNÉRAL
-      // =====================================================
-
       final general =
           preferences[
                   'generalNotifications'] ==
@@ -771,10 +652,6 @@ class _MainNavigationState extends State<MainNavigation>
       if (!general) {
         return false;
       }
-
-      // =====================================================
-      // TYPE
-      // =====================================================
 
       final normalized =
           _normalizeNotificationType(
@@ -991,10 +868,6 @@ class _MainNavigationState extends State<MainNavigation>
       notification,
     );
 
-    // =======================================================
-    // TRANSFERT INTERNE
-    // =======================================================
-
     if (internal) {
       final destinationType =
           _accountTypeLabel(
@@ -1010,10 +883,6 @@ class _MainNavigationState extends State<MainNavigation>
       return 'Vous effectuez un virement de '
           '$amount vers votre $destinationType.';
     }
-
-    // =======================================================
-    // TRANSFERT EXTERNE
-    // =======================================================
 
     final senderName =
         (notification['senderName'] ?? '')
@@ -1047,10 +916,6 @@ class _MainNavigationState extends State<MainNavigation>
       notification,
     );
 
-    // =======================================================
-    // TRANSFERT SORTANT
-    // =======================================================
-
     if (isOutgoing) {
       final recipientAccount =
           (notification[
@@ -1079,10 +944,6 @@ class _MainNavigationState extends State<MainNavigation>
           : 'Montant envoyé : $amount';
     }
 
-    // =======================================================
-    // TRANSFERT ENTRANT
-    // =======================================================
-
     if (isIncoming) {
       if (senderName.isNotEmpty &&
           senderAccount.isNotEmpty) {
@@ -1110,10 +971,6 @@ class _MainNavigationState extends State<MainNavigation>
           : 'Montant reçu : $amount';
     }
 
-    // =======================================================
-    // COMPATIBILITÉ
-    // =======================================================
-
     final message =
         (notification['message'] ?? '')
             .toString()
@@ -1137,10 +994,6 @@ class _MainNavigationState extends State<MainNavigation>
       notification,
     );
 
-    // ---------------------------------------------
-    // VIREMENT EXTERNE
-    // ---------------------------------------------
-
     if (!internal) {
       return primaryBlue;
     }
@@ -1161,20 +1014,12 @@ class _MainNavigationState extends State<MainNavigation>
             .trim()
             .toUpperCase();
 
-    // ---------------------------------------------
-    // COURANT → ÉPARGNE
-    // ---------------------------------------------
-
     if (sourceType ==
             'CURRENT' &&
         destinationType ==
             'SAVINGS') {
       return currentToSavingsGreen;
     }
-
-    // ---------------------------------------------
-    // ÉPARGNE → COURANT
-    // ---------------------------------------------
 
     if (sourceType ==
             'SAVINGS' &&
@@ -1199,10 +1044,6 @@ class _MainNavigationState extends State<MainNavigation>
       notification,
     );
 
-    // ---------------------------------------------
-    // VIREMENT EXTERNE
-    // ---------------------------------------------
-
     if (!internal) {
       return darkBlue;
     }
@@ -1223,20 +1064,12 @@ class _MainNavigationState extends State<MainNavigation>
             .trim()
             .toUpperCase();
 
-    // ---------------------------------------------
-    // COURANT → ÉPARGNE
-    // ---------------------------------------------
-
     if (sourceType ==
             'CURRENT' &&
         destinationType ==
             'SAVINGS') {
       return currentToSavingsDarkGreen;
     }
-
-    // ---------------------------------------------
-    // ÉPARGNE → COURANT
-    // ---------------------------------------------
 
     if (sourceType ==
             'SAVINGS' &&
@@ -1257,10 +1090,6 @@ class _MainNavigationState extends State<MainNavigation>
         notification,
   ) {
     if (!mounted) return;
-
-    // =======================================================
-    // PROTECTION ABSOLUE
-    // =======================================================
 
     final notificationType =
         (notification['type'] ?? '')
@@ -1283,10 +1112,6 @@ class _MainNavigationState extends State<MainNavigation>
       notification,
     );
 
-    // =======================================================
-    // TRANSFERT SORTANT
-    // =======================================================
-
     if (outgoing) {
       debugPrint(
         '[NOTIFICATIONS] 🚫 Bandeau ignoré : '
@@ -1296,14 +1121,6 @@ class _MainNavigationState extends State<MainNavigation>
 
       return;
     }
-
-    // =======================================================
-    // AUTORISER UNIQUEMENT :
-    //
-    // - TRANSFER_IN
-    // - ancien TRANSFER reçu
-    // - transfert interne
-    // =======================================================
 
     if (!incoming &&
         !internal) {
@@ -1349,10 +1166,6 @@ class _MainNavigationState extends State<MainNavigation>
     _notificationAnimationController
         .forward();
 
-    // =======================================================
-    // COMPTEUR 8 → 0
-    // =======================================================
-
     _notificationCountdownTimer =
         Timer.periodic(
       const Duration(
@@ -1383,10 +1196,6 @@ class _MainNavigationState extends State<MainNavigation>
         });
       },
     );
-
-    // =======================================================
-    // DISPARITION APRÈS 8 SECONDES
-    // =======================================================
 
     _notificationBannerTimer =
         Timer(
@@ -1619,12 +1428,26 @@ class _MainNavigationState extends State<MainNavigation>
       AccountsScreen(
         userId:
             widget.user.id,
+        isDark:
+            Theme.of(context).brightness ==
+                Brightness.dark,
+        onThemeChanged:
+            widget.onThemeChanged,
+
+        // ===================================================
+        // NOUVEAU :
+        // synchronisation avec MainNavigation
+        // ===================================================
+
         courantBalance:
             _courantBalance,
+
         epargneBalance:
             _epargneBalance,
+
         onCourantBalanceChanged:
             _updateCourantBalance,
+
         onEpargneBalanceChanged:
             _updateEpargneBalance,
       ),
@@ -1846,10 +1669,6 @@ class _MainNavigationState extends State<MainNavigation>
           .shrink();
     }
 
-    // =======================================================
-    // PROTECTION SUPPLÉMENTAIRE
-    // =======================================================
-
     final notificationType =
         (notification['type'] ?? '')
             .toString()
@@ -1871,18 +1690,10 @@ class _MainNavigationState extends State<MainNavigation>
       notification,
     );
 
-    // =======================================================
-    // SORTANT : JAMAIS DE BANDEAU
-    // =======================================================
-
     if (outgoing) {
       return const SizedBox
           .shrink();
     }
-
-    // =======================================================
-    // SEULS LES ENTRANTS ET INTERNES SONT AUTORISÉS
-    // =======================================================
 
     if (!incoming &&
         !internal) {
@@ -1890,19 +1701,11 @@ class _MainNavigationState extends State<MainNavigation>
           .shrink();
     }
 
-    // =======================================================
-    // DÉTECTION
-    // =======================================================
-
     final isIncoming =
         incoming;
 
     final isOutgoing =
         outgoing;
-
-    // =======================================================
-    // TITRE
-    // =======================================================
 
     final title =
         (notification['title'] ??
@@ -1915,18 +1718,10 @@ class _MainNavigationState extends State<MainNavigation>
                             : 'Virement'))
             .toString();
 
-    // =======================================================
-    // MESSAGE
-    // =======================================================
-
     final message =
         _buildBannerMessage(
       notification,
     );
-
-    // =======================================================
-    // DONNÉES
-    // =======================================================
 
     final amount =
         _formatAmount(
@@ -1956,10 +1751,6 @@ class _MainNavigationState extends State<MainNavigation>
           'destinationAccountType'],
     );
 
-    // =======================================================
-    // COULEURS
-    // =======================================================
-
     final bannerPrimary =
         _getBannerPrimaryColor(
       notification,
@@ -1969,10 +1760,6 @@ class _MainNavigationState extends State<MainNavigation>
         _getBannerDarkColor(
       notification,
     );
-
-    // =======================================================
-    // ICÔNE
-    // =======================================================
 
     final IconData bannerIcon =
         internal
@@ -1984,18 +1771,15 @@ class _MainNavigationState extends State<MainNavigation>
     return Material(
       color:
           Colors.transparent,
-
       child:
           Container(
         width:
             double.infinity,
-
         constraints:
             const BoxConstraints(
           maxWidth:
               520,
         ),
-
         decoration:
             BoxDecoration(
           gradient:
@@ -2009,12 +1793,10 @@ class _MainNavigationState extends State<MainNavigation>
               bannerDark,
             ],
           ),
-
           borderRadius:
               BorderRadius.circular(
             20,
           ),
-
           border:
               Border.all(
             color:
@@ -2023,7 +1805,6 @@ class _MainNavigationState extends State<MainNavigation>
                   0.20,
             ),
           ),
-
           boxShadow: [
             BoxShadow(
               color:
@@ -2039,7 +1820,6 @@ class _MainNavigationState extends State<MainNavigation>
                 10,
               ),
             ),
-
             const BoxShadow(
               color:
                   Colors.black26,
@@ -2053,24 +1833,17 @@ class _MainNavigationState extends State<MainNavigation>
             ),
           ],
         ),
-
         child:
             ClipRRect(
           borderRadius:
               BorderRadius.circular(
             20,
           ),
-
           child:
               Column(
             mainAxisSize:
                 MainAxisSize.min,
-
             children: [
-              // =================================================
-              // CONTENU
-              // =================================================
-
               Padding(
                 padding:
                     const EdgeInsets.fromLTRB(
@@ -2079,17 +1852,11 @@ class _MainNavigationState extends State<MainNavigation>
                   10,
                   12,
                 ),
-
                 child:
                     Row(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
-
                   children: [
-                    // ==========================================
-                    // ICÔNE
-                    // ==========================================
-
                     Container(
                       width:
                           50,
@@ -2128,21 +1895,12 @@ class _MainNavigationState extends State<MainNavigation>
                           12,
                     ),
 
-                    // ==========================================
-                    // TEXTE
-                    // ==========================================
-
                     Expanded(
                       child:
                           Column(
                         crossAxisAlignment:
                             CrossAxisAlignment.start,
-
                         children: [
-                          // ==================================
-                          // TITRE + TIMER
-                          // ==================================
-
                           Row(
                             children: [
                               Expanded(
@@ -2212,10 +1970,6 @@ class _MainNavigationState extends State<MainNavigation>
                                 7,
                           ),
 
-                          // ==================================
-                          // EXTERNE : NOM
-                          // ==================================
-
                           if (!internal &&
                               senderName.isNotEmpty)
                             Text(
@@ -2234,10 +1988,6 @@ class _MainNavigationState extends State<MainNavigation>
                                     FontWeight.w700,
                               ),
                             ),
-
-                          // ==================================
-                          // EXTERNE : COMPTE
-                          // ==================================
 
                           if (!internal &&
                               senderAccount.isNotEmpty)
@@ -2258,7 +2008,7 @@ class _MainNavigationState extends State<MainNavigation>
                                         0.82,
                                   ),
                                   fontSize:
-                                    11.5,
+                                      11.5,
                                 ),
                               ),
                             ),
@@ -2267,10 +2017,6 @@ class _MainNavigationState extends State<MainNavigation>
                             height:
                                 4,
                           ),
-
-                          // ==================================
-                          // MESSAGE / MONTANT
-                          // ==================================
 
                           Text(
                             internal
@@ -2295,10 +2041,6 @@ class _MainNavigationState extends State<MainNavigation>
                                   1.28,
                             ),
                           ),
-
-                          // ==================================
-                          // TRANSFERT INTERNE
-                          // ==================================
 
                           if (internal)
                             Padding(
@@ -2330,22 +2072,22 @@ class _MainNavigationState extends State<MainNavigation>
                                 ),
                                 child:
                                     Text(
-                                      '${sourceType.toUpperCase()}  →  ${destinationType.toUpperCase()}',
-                                      style:
-                                          TextStyle(
-                                        color:
-                                            Colors.white.withValues(
-                                          alpha:
-                                              0.90,
-                                        ),
-                                        fontSize:
-                                            9.5,
-                                        fontWeight:
-                                            FontWeight.w800,
-                                        letterSpacing:
-                                            0.25,
-                                      ),
+                                  '${sourceType.toUpperCase()}  →  ${destinationType.toUpperCase()}',
+                                  style:
+                                      TextStyle(
+                                    color:
+                                        Colors.white.withValues(
+                                      alpha:
+                                          0.90,
                                     ),
+                                    fontSize:
+                                        9.5,
+                                    fontWeight:
+                                        FontWeight.w800,
+                                    letterSpacing:
+                                        0.25,
+                                  ),
+                                ),
                               ),
                             ),
                         ],
@@ -2356,10 +2098,6 @@ class _MainNavigationState extends State<MainNavigation>
                       width:
                           3,
                     ),
-
-                    // ==========================================
-                    // X
-                    // ==========================================
 
                     SizedBox(
                       width:
@@ -2385,24 +2123,20 @@ class _MainNavigationState extends State<MainNavigation>
                             _hideNotificationBanner,
                         icon:
                             Icon(
-                              Icons.close,
-                              color:
-                                  Colors.white.withValues(
-                                alpha:
-                                    0.95,
-                                ),
-                              size:
-                                  19,
-                            ),
+                          Icons.close,
+                          color:
+                              Colors.white.withValues(
+                            alpha:
+                                0.95,
+                          ),
+                          size:
+                              19,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-
-              // =================================================
-              // BARRE DE PROGRESSION
-              // =================================================
 
               TweenAnimationBuilder<double>(
                 key:
@@ -2410,7 +2144,6 @@ class _MainNavigationState extends State<MainNavigation>
                   notification[
                       'id'],
                 ),
-
                 tween:
                     Tween<double>(
                   begin:
@@ -2418,10 +2151,8 @@ class _MainNavigationState extends State<MainNavigation>
                   end:
                       0.0,
                 ),
-
                 duration:
                     bannerDuration,
-
                 builder:
                     (
                   context,
@@ -2441,7 +2172,6 @@ class _MainNavigationState extends State<MainNavigation>
                               0.12,
                         ),
                       ),
-
                       FractionallySizedBox(
                         widthFactor:
                             value,

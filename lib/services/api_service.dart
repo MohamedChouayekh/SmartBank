@@ -12,14 +12,9 @@ class ApiService {
   // CONFIGURATION CENTRALE
   // ===========================================================
 
-  /// Adresse du backend pour Flutter Web / Chrome
-  /// lorsque Spring Boot tourne sur le même PC.
-  ///
-  /// Pour Android avec `adb reverse tcp:8080 tcp:8080`,
-  /// cette même configuration peut être utilisée avec
-  /// l'adresse locale adaptée.
+  /// Adresse publique du backend Railway.
   static const String baseUrl =
-    'https://humble-bravery-production-282c.up.railway.app';
+      'https://humble-bravery-production-282c.up.railway.app';
 
   final http.Client _client;
 
@@ -102,6 +97,142 @@ class ApiService {
           Uri.parse('$baseUrl$endpoint'),
           headers: {
             'Accept': 'application/json',
+          },
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
+  }
+
+  // ===========================================================
+  // GET ADMINISTRATEUR
+  // ===========================================================
+  //
+  // Utilisé uniquement pour les endpoints protégés
+  // par Spring Security avec le rôle BANK_ADMIN.
+  //
+  // Les appels normaux get() restent inchangés.
+  // ===========================================================
+
+  Future<http.Response> adminGet(
+    String endpoint, {
+    required String username,
+    required String password,
+  }) async {
+    final credentials =
+        base64Encode(
+          utf8.encode(
+            '$username:$password',
+          ),
+        );
+
+    return _client
+        .get(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Basic $credentials',
+          },
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
+  }
+
+  // ===========================================================
+  // POST ADMINISTRATEUR
+  // ===========================================================
+  //
+  // Utilisé uniquement pour les endpoints protégés
+  // par Spring Security avec le rôle BANK_ADMIN.
+  // ===========================================================
+
+  Future<http.Response> adminPost(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    required String username,
+    required String password,
+  }) async {
+    final credentials =
+        base64Encode(
+          utf8.encode(
+            '$username:$password',
+          ),
+        );
+
+    return _client
+        .post(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Basic $credentials',
+          },
+          body: body == null
+              ? null
+              : jsonEncode(body),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
+  }
+
+  // ===========================================================
+  // PUT ADMINISTRATEUR
+  // ===========================================================
+
+  Future<http.Response> adminPut(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    required String username,
+    required String password,
+  }) async {
+    final credentials =
+        base64Encode(
+          utf8.encode(
+            '$username:$password',
+          ),
+        );
+
+    return _client
+        .put(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Basic $credentials',
+          },
+          body: body == null
+              ? null
+              : jsonEncode(body),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+        );
+  }
+
+  // ===========================================================
+  // DELETE ADMINISTRATEUR
+  // ===========================================================
+
+  Future<http.Response> adminDelete(
+    String endpoint, {
+    required String username,
+    required String password,
+  }) async {
+    final credentials =
+        base64Encode(
+          utf8.encode(
+            '$username:$password',
+          ),
+        );
+
+    return _client
+        .delete(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Basic $credentials',
           },
         )
         .timeout(

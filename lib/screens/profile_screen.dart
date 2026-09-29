@@ -5,6 +5,7 @@ import '../services/device_session_service.dart';
 import 'login_screen.dart';
 import 'notifications_screen.dart';
 import 'security_screen.dart';
+import 'support_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final User user;
@@ -402,6 +403,10 @@ class ProfileScreen extends StatelessWidget {
                     10,
               ),
 
+              // =================================================
+              // APPARENCE
+              // =================================================
+
               _buildActionTile(
                 context,
                 icon:
@@ -427,6 +432,10 @@ class ProfileScreen extends StatelessWidget {
                 onTap:
                     onThemeChanged,
               ),
+
+              // =================================================
+              // NOTIFICATIONS
+              // =================================================
 
               _buildActionTile(
                 context,
@@ -456,6 +465,10 @@ class ProfileScreen extends StatelessWidget {
                   );
                 },
               ),
+
+              // =================================================
+              // SÉCURITÉ
+              // =================================================
 
               _buildActionTile(
                 context,
@@ -490,6 +503,10 @@ class ProfileScreen extends StatelessWidget {
                 },
               ),
 
+              // =================================================
+              // AIDE & SUPPORT
+              // =================================================
+
               _buildActionTile(
                 context,
                 icon:
@@ -505,13 +522,14 @@ class ProfileScreen extends StatelessWidget {
                   Icons.chevron_right_rounded,
                 ),
                 onTap: () {
-                  ScaffoldMessenger.of(
+                  Navigator.push(
                     context,
-                  ).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text(
-                        'Le service Aide & Support sera disponible prochainement.',
+                    MaterialPageRoute(
+                      builder:
+                          (context) =>
+                              SupportScreen(
+                        userId:
+                            user.id,
                       ),
                     ),
                   );
@@ -522,6 +540,10 @@ class ProfileScreen extends StatelessWidget {
                 height:
                     25,
               ),
+
+              // =================================================
+              // DÉCONNEXION
+              // =================================================
 
               SizedBox(
                 width:
