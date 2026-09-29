@@ -60,7 +60,7 @@ public class RewardController {
         List<RewardEventResponse> events = rewardEventRepository
                 .findTop20ByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(RewardEventResponse::new)
+                .map(event -> new RewardEventResponse(event))
                 .toList();
 
         return ResponseEntity.ok(events);
