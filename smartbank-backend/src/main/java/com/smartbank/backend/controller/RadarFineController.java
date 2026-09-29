@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/amendes")
@@ -32,14 +33,54 @@ public class RadarFineController {
     }
 
     @PostMapping("/{reference}/payer")
-    public ResponseEntity<?> payFine(@PathVariable String reference) {
+    public ResponseEntity<?> payFine(
+            @PathVariable String reference,
+            @RequestBody Map<String, Object> request) {
 
-        boolean paid = radarFineService.payFine(reference);
+        try {
 
-        if (!paid) {
-            return ResponseEntity.status(404).body("Amende introuvable ou déjà payée.");
+            if (request.get("accountNumber") == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "message",
+                                "Le compte est obligatoire."
+                        ));
+            }
+
+            String accountNumber =
+                    request.get("accountNumber")
+                            .toString()
+                            .trim();
+
+            boolean paid = radarFineService.payFine(
+                    reference,
+                    accountNumber
+            );
+
+            if (!paid) {
+                return ResponseEntity.status(404)
+                        .body(Map.of(
+                                "message",
+                                "Amende introuvable ou déjà payée."
+                        ));
+            }
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Amende payée avec succès."
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message",
+                            e.getMessage() != null
+                                    ? e.getMessage()
+                                    : "Erreur lors du paiement de l'amende."
+                    ));
         }
-
-        return ResponseEntity.ok("Amende payée avec succès.");
     }
 }

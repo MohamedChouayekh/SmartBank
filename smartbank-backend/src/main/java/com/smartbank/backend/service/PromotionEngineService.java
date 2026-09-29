@@ -2,10 +2,12 @@ package com.smartbank.backend.service;
 
 import com.smartbank.backend.entity.Account;
 import com.smartbank.backend.entity.BillChallenge;
+import com.smartbank.backend.entity.RewardEvent;
 import com.smartbank.backend.entity.RewardWallet;
 import com.smartbank.backend.entity.User;
 import com.smartbank.backend.repository.AccountRepository;
 import com.smartbank.backend.repository.BillChallengeRepository;
+import com.smartbank.backend.repository.RewardEventRepository;
 import com.smartbank.backend.repository.RewardWalletRepository;
 
 import org.springframework.stereotype.Service;
@@ -18,43 +20,34 @@ import java.math.RoundingMode;
 public class PromotionEngineService {
 
     private static final BigDecimal POINTS_THRESHOLD =
-            new BigDecimal("10");
+            new BigDecimal("10.000");
 
     private static final int BILL_PAYMENT_POINTS = 20;
 
     private static final int BILL_CHALLENGE_TARGET = 5;
 
     private static final BigDecimal BILL_CHALLENGE_REWARD =
-            new BigDecimal("5");
+            new BigDecimal("5.000");
 
     private final RewardWalletRepository rewardWalletRepository;
     private final BillChallengeRepository billChallengeRepository;
     private final AccountRepository accountRepository;
     private final NotificationService notificationService;
+    private final RewardEventRepository rewardEventRepository;
 
     public PromotionEngineService(
             RewardWalletRepository rewardWalletRepository,
             BillChallengeRepository billChallengeRepository,
             AccountRepository accountRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            RewardEventRepository rewardEventRepository) {
 
-        this.rewardWalletRepository =
-                rewardWalletRepository;
-
-        this.billChallengeRepository =
-                billChallengeRepository;
-
-        this.accountRepository =
-                accountRepository;
-
-        this.notificationService =
-                notificationService;
+        this.rewardWalletRepository = rewardWalletRepository;
+        this.billChallengeRepository = billChallengeRepository;
+        this.accountRepository = accountRepository;
+        this.notificationService = notificationService;
+        this.rewardEventRepository = rewardEventRepository;
     }
-
-    // =========================================================
-    // POINT D'ENTRÉE
-    // APPELÉ APRÈS UN PAIEMENT RÉUSSI
-    // =========================================================
 
     @Transactional
     public void evaluatePayment(
@@ -63,42 +56,90 @@ public class PromotionEngineService {
             String biller,
             BigDecimal amount) {
 
-        Long userId =
-                account.getUser().getId();
+        if (account == null) {
+            throw new IllegalArgumentException(
+                    "Le compte est obligatoire pour appliquer les promotions."
+            );
+        }
 
-        RewardWallet wallet =
-                getOrCreateWallet(
-                        userId,
-                        account.getUser()
-                );
+        if (account.getUser() == null ||
+                account.getUser().getId() == null) {
+
+            throw new IllegalArgumentException(
+                    "Le compte doit être associé à un utilisateur."
+            );
+        }
+
+        if (amount == null ||
+                amount.compareTo(BigDecimal.ZERO) <= 0) {
+
+            throw new IllegalArgumentException(
+                    "Le montant du paiement doit être supérieur à zéro."
+            );
+        }
+
+        Long userId = account.getUser().getId();
+        User user = account.getUser();
+
+        RewardWallet wallet = getOrCreateWallet(userId, user);
+
+        String normalizedCategory =
+                category == null ? "" : category.trim();
+
+        String normalizedBiller =
+                biller == null || biller.trim().isEmpty()
+                        ? "Service"
+                        : biller.trim();
+
+        boolean isBill =
+                "Factures".equalsIgnoreCase(normalizedCategory);
 
         // =====================================================
         // 1. POINTS CUMULÉS
-        // 10 DT = 1 POINT
         // =====================================================
 
-        int pointsFromAmount =
-                applyCumulativePoints(
-                        wallet,
-                        amount
-                );
+        int pointsFromAmount = applyCumulativePoints(wallet, amount);
 
-        boolean isBill =
-                "Factures".equalsIgnoreCase(
-                        category
-                );
+        if (pointsFromAmount > 0) {
+
+            RewardEvent pointsEvent = new RewardEvent();
+            pointsEvent.setUser(user);
+            pointsEvent.setType("POINTS");
+            pointsEvent.setPointsDelta(pointsFromAmount);
+            pointsEvent.setCashAmount(BigDecimal.ZERO);
+            pointsEvent.setTitle("Points sur dépenses cumulées");
+            pointsEvent.setDescription(
+                    "Paiement de " + amount + " TND : +"
+                            + pointsFromAmount + " point(s)."
+            );
+            pointsEvent.setOperationReference(normalizedBiller);
+
+            rewardEventRepository.save(pointsEvent);
+        }
 
         // =====================================================
         // 2. BONUS FACTURE
-        // +20 POINTS
         // =====================================================
 
         if (isBill) {
 
             wallet.setPointsBalance(
-                    wallet.getPointsBalance()
-                            + BILL_PAYMENT_POINTS
+                    wallet.getPointsBalance() + BILL_PAYMENT_POINTS
             );
+
+            RewardEvent billEvent = new RewardEvent();
+            billEvent.setUser(user);
+            billEvent.setType("BILL_BONUS");
+            billEvent.setPointsDelta(BILL_PAYMENT_POINTS);
+            billEvent.setCashAmount(BigDecimal.ZERO);
+            billEvent.setTitle("Bonus facture");
+            billEvent.setDescription(
+                    "Facture " + normalizedBiller + " payée : +"
+                            + BILL_PAYMENT_POINTS + " points."
+            );
+            billEvent.setOperationReference(normalizedBiller);
+
+            rewardEventRepository.save(billEvent);
         }
 
         rewardWalletRepository.save(wallet);
@@ -112,88 +153,59 @@ public class PromotionEngineService {
             evaluateBillChallenge(
                     userId,
                     account,
-                    biller,
+                    normalizedBiller,
                     pointsFromAmount
             );
 
         } else {
-
-            // =================================================
-            // NOTIFICATION POUR SERVICES / RECHARGES
-            // =================================================
 
             if (pointsFromAmount > 0) {
 
                 notificationService.notifyPromotion(
                         userId,
                         "Points gagnés",
-                        "Paiement de "
-                                + amount
+                        "Paiement de " + amount
                                 + " TND : vous avez gagné "
-                                + pointsFromAmount
-                                + " point(s)."
+                                + pointsFromAmount + " point(s)."
                 );
             }
         }
     }
 
-    // =========================================================
-    // CALCUL DES POINTS CUMULÉS
-    //
-    // Exemple :
-    // 7 DT + 8 DT = 15 DT
-    // → +1 point
-    // → reste 5 DT
-    // =========================================================
-
     private int applyCumulativePoints(
             RewardWallet wallet,
             BigDecimal amount) {
 
-        BigDecimal pending =
-                wallet.getPendingAmountForPoints();
+        BigDecimal pending = wallet.getPendingAmountForPoints();
 
         if (pending == null) {
             pending = BigDecimal.ZERO;
         }
 
-        BigDecimal total =
-                pending.add(amount);
+        BigDecimal total = pending.add(amount);
 
-        int pointsEarned =
-                total.divide(
-                        POINTS_THRESHOLD,
-                        0,
-                        RoundingMode.DOWN
-                ).intValue();
+        int pointsEarned = total.divide(
+                POINTS_THRESHOLD,
+                0,
+                RoundingMode.DOWN
+        ).intValue();
 
-        BigDecimal remainder =
-                total.subtract(
-                        POINTS_THRESHOLD.multiply(
-                                BigDecimal.valueOf(
-                                        pointsEarned
-                                )
-                        )
-                );
-
-        wallet.setPendingAmountForPoints(
-                remainder
+        BigDecimal remainder = total.subtract(
+                POINTS_THRESHOLD.multiply(
+                        BigDecimal.valueOf(pointsEarned)
+                )
         );
 
-        if (pointsEarned > 0) {
+        wallet.setPendingAmountForPoints(remainder);
 
+        if (pointsEarned > 0) {
             wallet.setPointsBalance(
-                    wallet.getPointsBalance()
-                            + pointsEarned
+                    wallet.getPointsBalance() + pointsEarned
             );
         }
 
         return pointsEarned;
     }
-
-    // =========================================================
-    // CHALLENGE 5 FACTURES
-    // =========================================================
 
     private void evaluateBillChallenge(
             Long userId,
@@ -203,170 +215,88 @@ public class PromotionEngineService {
 
         BillChallenge challenge =
                 billChallengeRepository
-                        .findByUserIdAndStatus(
-                                userId,
-                                "ACTIVE"
-                        )
+                        .findByUserIdAndStatus(userId, "ACTIVE")
                         .orElseGet(() -> {
 
-                            BillChallenge newChallenge =
-                                    new BillChallenge();
-
-                            newChallenge.setUser(
-                                    account.getUser()
-                            );
-
-                            newChallenge.setCountCurrentCycle(
-                                    0
-                            );
-
-                            newChallenge.setStatus(
-                                    "ACTIVE"
-                            );
-
+                            BillChallenge newChallenge = new BillChallenge();
+                            newChallenge.setUser(account.getUser());
+                            newChallenge.setCountCurrentCycle(0);
+                            newChallenge.setStatus("ACTIVE");
                             return newChallenge;
                         });
 
-        int newCount =
-                challenge.getCountCurrentCycle() + 1;
+        int newCount = challenge.getCountCurrentCycle() + 1;
+        challenge.setCountCurrentCycle(newCount);
 
-        challenge.setCountCurrentCycle(
-                newCount
-        );
-
-        // =====================================================
-        // CHALLENGE TERMINÉ
-        // =====================================================
+        int totalPoints = pointsFromAmount + BILL_PAYMENT_POINTS;
 
         if (newCount >= BILL_CHALLENGE_TARGET) {
 
-            // +5 DT sur le compte courant
             account.setBalance(
-                    account.getBalance()
-                            .add(BILL_CHALLENGE_REWARD)
+                    account.getBalance().add(BILL_CHALLENGE_REWARD)
             );
 
-            accountRepository.save(
-                    account
+            accountRepository.save(account);
+
+            challenge.setStatus("COMPLETED");
+            billChallengeRepository.save(challenge);
+
+            BillChallenge newCycle = new BillChallenge();
+            newCycle.setUser(account.getUser());
+            newCycle.setCountCurrentCycle(0);
+            newCycle.setStatus("ACTIVE");
+            billChallengeRepository.save(newCycle);
+
+            RewardEvent challengeEvent = new RewardEvent();
+            challengeEvent.setUser(account.getUser());
+            challengeEvent.setType("BILL_CHALLENGE");
+            challengeEvent.setPointsDelta(0);
+            challengeEvent.setCashAmount(BILL_CHALLENGE_REWARD);
+            challengeEvent.setTitle("Challenge 5 factures terminé");
+            challengeEvent.setDescription(
+                    "5 paiements de factures effectués : +"
+                            + BILL_CHALLENGE_REWARD
+                            + " DT crédités sur le compte courant."
             );
+            challengeEvent.setOperationReference(biller);
 
-            challenge.setStatus(
-                    "COMPLETED"
-            );
-
-            billChallengeRepository.save(
-                    challenge
-            );
-
-            // =================================================
-            // NOUVEAU CYCLE
-            // =================================================
-
-            BillChallenge newCycle =
-                    new BillChallenge();
-
-            newCycle.setUser(
-                    account.getUser()
-            );
-
-            newCycle.setCountCurrentCycle(
-                    0
-            );
-
-            newCycle.setStatus(
-                    "ACTIVE"
-            );
-
-            billChallengeRepository.save(
-                    newCycle
-            );
-
-            // =================================================
-            // UNE NOTIFICATION
-            // =================================================
-
-            int totalPoints =
-                    pointsFromAmount
-                            + BILL_PAYMENT_POINTS;
+            rewardEventRepository.save(challengeEvent);
 
             notificationService.notifyPromotion(
                     userId,
                     "Challenge terminé !",
-                    "Facture "
-                            + biller
-                            + " payée : +"
-                            + totalPoints
-                            + " points. "
-                            + "Vous avez effectué 5 paiements de factures "
-                            + "et gagné "
-                            + BILL_CHALLENGE_REWARD
+                    "Facture " + biller + " payée : +" + totalPoints
+                            + " points. Vous avez effectué 5 paiements de "
+                            + "factures et gagné " + BILL_CHALLENGE_REWARD
                             + " DT sur votre compte courant."
             );
 
         } else {
 
-            billChallengeRepository.save(
-                    challenge
-            );
-
-            // =================================================
-            // UNE NOTIFICATION
-            // =================================================
-
-            int totalPoints =
-                    pointsFromAmount
-                            + BILL_PAYMENT_POINTS;
+            billChallengeRepository.save(challenge);
 
             notificationService.notifyPromotion(
                     userId,
                     "Points gagnés",
-                    "Facture "
-                            + biller
-                            + " payée : +"
-                            + totalPoints
-                            + " points. "
-                            + "Challenge factures : "
-                            + newCount
-                            + " / "
-                            + BILL_CHALLENGE_TARGET
-                            + "."
+                    "Facture " + biller + " payée : +" + totalPoints
+                            + " points. Challenge factures : " + newCount
+                            + " / " + BILL_CHALLENGE_TARGET + "."
             );
         }
     }
 
-    // =========================================================
-    // RÉCUPÉRER OU CRÉER LE PORTEFEUILLE
-    // =========================================================
-
-    private RewardWallet getOrCreateWallet(
-            Long userId,
-            User user) {
+    private RewardWallet getOrCreateWallet(Long userId, User user) {
 
         return rewardWalletRepository
                 .findByUserId(userId)
                 .orElseGet(() -> {
 
-                    RewardWallet newWallet =
-                            new RewardWallet();
-
+                    RewardWallet newWallet = new RewardWallet();
                     newWallet.setUser(user);
-
-                    newWallet.setPointsBalance(
-                            0
-                    );
-
-                    newWallet.setPendingAmountForPoints(
-                            BigDecimal.ZERO
-                    );
-
-                    // Conservé pour le futur cashback
-                    newWallet.setTotalCashback(
-                            BigDecimal.ZERO
-                    );
-
-                    return rewardWalletRepository.save(
-                            newWallet
-                    );
+                    newWallet.setPointsBalance(0);
+                    newWallet.setPendingAmountForPoints(BigDecimal.ZERO);
+                    newWallet.setTotalCashback(BigDecimal.ZERO);
+                    return rewardWalletRepository.save(newWallet);
                 });
     }
 }
