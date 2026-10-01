@@ -272,6 +272,107 @@ class _CardsScreenState extends State<CardsScreen> {
   }
 
   // ==========================================================================
+  // PAIEMENT PAR CARTE
+  // ==========================================================================
+
+  Future<void> _showCardPaymentDialog(
+    Map<String, dynamic> card,
+  ) async {
+    final amountController = TextEditingController();
+    final merchantController = TextEditingController();
+
+    final cardId = card['id'];
+
+    final result = await showDialog<_WithdrawalResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return _CardPaymentDialog(
+          card: card,
+          courantBalance: widget.courantBalance,
+          amountController: amountController,
+          merchantController: merchantController,
+          onPay: (amountText, merchant) async {
+            return _performCardPayment(
+              cardId: cardId,
+              amountText: amountText,
+              merchant: merchant,
+            );
+          },
+        );
+      },
+    );
+
+    amountController.dispose();
+    merchantController.dispose();
+
+    if (!mounted) return;
+
+    if (result == null) {
+      return;
+    }
+
+    if (result.success) {
+      if (result.newBalance != null) {
+        widget.onCourantBalanceChanged?.call(result.newBalance!);
+      }
+
+      _showSnackBar(
+        'Paiement de ${result.amount.toStringAsFixed(3)} TND effectué avec succès.',
+      );
+    } else if (result.errorMessage != null) {
+      _showSnackBar(result.errorMessage!);
+    }
+  }
+
+  Future<_WithdrawalResult> _performCardPayment({
+    required dynamic cardId,
+    required String amountText,
+    required String merchant,
+  }) async {
+    final rawAmount = amountText.trim().replaceAll(',', '.');
+    final amount = double.tryParse(rawAmount);
+
+    if (amount == null || amount <= 0) {
+      return const _WithdrawalResult.failure(
+        'Veuillez saisir un montant valide.',
+      );
+    }
+
+    try {
+      final response = await _apiService.post(
+        '/api/cards/$cardId/pay',
+        body: {
+          'userId': widget.userId,
+          'amount': amount,
+          'merchant': merchant.trim().isEmpty ? 'Marchand' : merchant.trim(),
+        },
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return _WithdrawalResult.failure(
+          _apiService.getErrorMessage(response),
+        );
+      }
+
+      final decoded = _apiService.decodeResponse(response);
+
+      double? newBalance;
+
+      if (decoded is Map && decoded['newBalance'] != null) {
+        newBalance = double.tryParse(decoded['newBalance'].toString());
+      }
+
+      return _WithdrawalResult.success(
+        amount: amount,
+        newBalance: newBalance,
+      );
+    } catch (error) {
+      return _WithdrawalResult.failure(_extractError(error));
+    }
+  }
+
+  // ==========================================================================
   // STATUT DE LA CARTE
   // ==========================================================================
 
@@ -919,7 +1020,7 @@ class _CardsScreenState extends State<CardsScreen> {
   }
 
   // ==========================================================================
-  // RETRAIT
+  // RETRAIT + PAIEMENT
   // ==========================================================================
 
   Widget _buildWithdrawalButton(
@@ -931,52 +1032,79 @@ class _CardsScreenState extends State<CardsScreen> {
     final isActive =
         status == 'ACTIVE';
 
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child:
-          OutlinedButton.icon(
-        onPressed: isActive
-            ? () =>
-                _showWithdrawalDialog(
-                  card,
-                )
-            : null,
-        icon: const Icon(
-          Icons.atm_rounded,
-        ),
-        label: Text(
-          isActive
-              ? 'Retrait d’espèces'
-              : 'Retrait indisponible',
-          style: const TextStyle(
-            fontWeight:
-                FontWeight.w700,
-          ),
-        ),
-        style:
-            OutlinedButton.styleFrom(
-          foregroundColor: isActive
-              ? _blue
-              : Colors.grey,
-          side: BorderSide(
-            color: isActive
-                ? _blue.withValues(
-                    alpha: 0.30,
-                  )
-                : Colors.grey.withValues(
-                    alpha: 0.25,
-                  ),
-          ),
-          shape:
-              RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(
-              14,
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child:
+              OutlinedButton.icon(
+            onPressed: isActive
+                ? () =>
+                    _showWithdrawalDialog(
+                      card,
+                    )
+                : null,
+            icon: const Icon(
+              Icons.atm_rounded,
+            ),
+            label: Text(
+              isActive
+                  ? 'Retrait d’espèces'
+                  : 'Retrait indisponible',
+              style: const TextStyle(
+                fontWeight:
+                    FontWeight.w700,
+              ),
+            ),
+            style:
+                OutlinedButton.styleFrom(
+              foregroundColor: isActive
+                  ? _blue
+                  : Colors.grey,
+              side: BorderSide(
+                color: isActive
+                    ? _blue.withValues(
+                        alpha: 0.30,
+                      )
+                    : Colors.grey.withValues(
+                        alpha: 0.25,
+                      ),
+              ),
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(
+                  14,
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton.icon(
+            onPressed: isActive
+                ? () => _showCardPaymentDialog(card)
+                : null,
+            icon: const Icon(Icons.shopping_cart_rounded),
+            label: Text(
+              isActive
+                  ? 'Payer par carte'
+                  : 'Paiement indisponible',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: isActive ? _green : Colors.grey,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1418,7 +1546,7 @@ class _CardsScreenState extends State<CardsScreen> {
 }
 
 // ============================================================================
-// RÉSULTAT DU RETRAIT
+// RÉSULTAT DU RETRAIT / PAIEMENT
 // ============================================================================
 
 class _WithdrawalResult {
@@ -1714,6 +1842,182 @@ class _WithdrawalDialogState
               : const Text(
                   'Confirmer',
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// DIALOGUE DE PAIEMENT PAR CARTE
+// ============================================================================
+
+class _CardPaymentDialog extends StatefulWidget {
+  final Map<String, dynamic> card;
+  final double courantBalance;
+  final TextEditingController amountController;
+  final TextEditingController merchantController;
+  final Future<_WithdrawalResult> Function(
+    String amountText,
+    String merchant,
+  ) onPay;
+
+  const _CardPaymentDialog({
+    required this.card,
+    required this.courantBalance,
+    required this.amountController,
+    required this.merchantController,
+    required this.onPay,
+  });
+
+  @override
+  State<_CardPaymentDialog> createState() => _CardPaymentDialogState();
+}
+
+class _CardPaymentDialogState extends State<_CardPaymentDialog> {
+  bool _isPaying = false;
+
+  Future<void> _confirmPayment() async {
+    if (_isPaying) return;
+
+    final rawAmount =
+        widget.amountController.text.trim().replaceAll(',', '.');
+    final amount = double.tryParse(rawAmount);
+
+    if (amount == null || amount <= 0) {
+      _showError('Veuillez saisir un montant valide.');
+      return;
+    }
+
+    if (amount > widget.courantBalance) {
+      _showError('Solde insuffisant.');
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isPaying = true;
+    });
+
+    final result = await widget.onPay(
+      widget.amountController.text,
+      widget.merchantController.text,
+    );
+
+    if (!mounted) return;
+
+    if (result.success) {
+      Navigator.of(context).pop(result);
+      return;
+    }
+
+    setState(() {
+      _isPaying = false;
+    });
+
+    if (result.errorMessage != null) {
+      _showError(result.errorMessage!);
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor =
+        theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65);
+
+    final cardType = widget.card['cardType']?.toString() ?? 'Carte bancaire';
+    final lastFour = widget.card['lastFourDigits']?.toString() ?? '0000';
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: const Text(
+        'Payer par carte',
+        style: TextStyle(fontWeight: FontWeight.w800),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$cardType •••• $lastFour',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Solde disponible : ${widget.courantBalance.toStringAsFixed(3)} TND',
+            style: TextStyle(color: textColor, fontSize: 13),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: widget.merchantController,
+            enabled: !_isPaying,
+            decoration: InputDecoration(
+              labelText: 'Marchand (optionnel)',
+              hintText: 'Ex. Carrefour',
+              prefixIcon: const Icon(Icons.store_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: widget.amountController,
+            enabled: !_isPaying,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Montant du paiement',
+              hintText: 'Ex. 200',
+              suffixText: 'TND',
+              prefixIcon: const Icon(Icons.payments_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Cashback de 2% automatique pour tout paiement de 200 DT ou plus.',
+            style: TextStyle(color: textColor, fontSize: 11),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isPaying
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                },
+          child: const Text('Annuler'),
+        ),
+        FilledButton(
+          onPressed: _isPaying ? null : _confirmPayment,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF087A5B),
+          ),
+          child: _isPaying
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Payer'),
         ),
       ],
     );

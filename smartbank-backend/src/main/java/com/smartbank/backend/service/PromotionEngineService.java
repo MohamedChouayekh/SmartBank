@@ -19,12 +19,9 @@ public class PromotionEngineService {
 
     private static final BigDecimal CASHBACK_THRESHOLD = new BigDecimal("200.000");
     private static final BigDecimal CASHBACK_RATE = new BigDecimal("0.02");
-    private static final int CARD_CHALLENGE_TARGET = 3;
-    private static final int CARD_CHALLENGE_POINTS = 100;
 
     private final RewardWalletRepository rewardWalletRepository;
     private final BillChallengeRepository billChallengeRepository;
-    private final CardPaymentChallengeRepository cardPaymentChallengeRepository;
     private final AccountRepository accountRepository;
     private final NotificationService notificationService;
     private final RewardEventRepository rewardEventRepository;
@@ -32,14 +29,12 @@ public class PromotionEngineService {
     public PromotionEngineService(
             RewardWalletRepository rewardWalletRepository,
             BillChallengeRepository billChallengeRepository,
-            CardPaymentChallengeRepository cardPaymentChallengeRepository,
             AccountRepository accountRepository,
             NotificationService notificationService,
             RewardEventRepository rewardEventRepository) {
 
         this.rewardWalletRepository = rewardWalletRepository;
         this.billChallengeRepository = billChallengeRepository;
-        this.cardPaymentChallengeRepository = cardPaymentChallengeRepository;
         this.accountRepository = accountRepository;
         this.notificationService = notificationService;
         this.rewardEventRepository = rewardEventRepository;
@@ -99,7 +94,7 @@ public class PromotionEngineService {
     }
 
     // =========================================================
-    // PAIEMENT PAR CARTE (cashback + challenge 3 paiements)
+    // PAIEMENT PAR CARTE (points + cashback)
     // =========================================================
 
     @Transactional
@@ -166,11 +161,14 @@ public class PromotionEngineService {
 
         rewardWalletRepository.save(wallet);
 
-        // =====================================================
-        // 3. CHALLENGE 3 PAIEMENTS CARTE
-        // =====================================================
-
-        evaluateCardChallenge(userId, account, normalizedMerchant, pointsFromAmount);
+        if (pointsFromAmount > 0 && amount.compareTo(CASHBACK_THRESHOLD) < 0) {
+            notificationService.notifyPromotion(
+                    userId,
+                    "Points gagnés",
+                    "Paiement carte de " + amount + " TND chez " + normalizedMerchant
+                            + " : vous avez gagné " + pointsFromAmount + " point(s)."
+            );
+        }
     }
 
     // =========================================================
@@ -286,67 +284,6 @@ public class PromotionEngineService {
                     "Facture " + biller + " payée : +" + totalPoints
                             + " points. Challenge factures : " + newCount + " / " + BILL_CHALLENGE_TARGET + "."
             );
-        }
-    }
-
-    // =========================================================
-    // CHALLENGE 3 PAIEMENTS CARTE
-    // =========================================================
-
-    private void evaluateCardChallenge(
-            Long userId, Account account, String merchant, int pointsFromAmount) {
-
-        CardPaymentChallenge challenge = cardPaymentChallengeRepository
-                .findByUserIdAndStatus(userId, "ACTIVE")
-                .orElseGet(() -> {
-                    CardPaymentChallenge newChallenge = new CardPaymentChallenge();
-                    newChallenge.setUser(account.getUser());
-                    newChallenge.setCountCurrentCycle(0);
-                    newChallenge.setStatus("ACTIVE");
-                    return newChallenge;
-                });
-
-        int newCount = challenge.getCountCurrentCycle() + 1;
-        challenge.setCountCurrentCycle(newCount);
-
-        if (newCount >= CARD_CHALLENGE_TARGET) {
-
-            RewardWallet wallet = getOrCreateWallet(userId, account.getUser());
-            wallet.setPointsBalance(wallet.getPointsBalance() + CARD_CHALLENGE_POINTS);
-            rewardWalletRepository.save(wallet);
-
-            challenge.setStatus("COMPLETED");
-            cardPaymentChallengeRepository.save(challenge);
-
-            CardPaymentChallenge newCycle = new CardPaymentChallenge();
-            newCycle.setUser(account.getUser());
-            newCycle.setCountCurrentCycle(0);
-            newCycle.setStatus("ACTIVE");
-            cardPaymentChallengeRepository.save(newCycle);
-
-            saveEvent(account.getUser(), "CARD_CHALLENGE", CARD_CHALLENGE_POINTS, BigDecimal.ZERO,
-                    "Challenge 3 paiements carte terminé",
-                    "3 paiements par carte effectués : +" + CARD_CHALLENGE_POINTS + " points.",
-                    merchant);
-
-            notificationService.notifyPromotion(
-                    userId,
-                    "Challenge terminé !",
-                    "Paiement chez " + merchant + " : vous avez effectué 3 paiements par carte et gagné "
-                            + CARD_CHALLENGE_POINTS + " points."
-            );
-
-        } else {
-
-            cardPaymentChallengeRepository.save(challenge);
-
-            if (pointsFromAmount > 0 || newCount > 0) {
-                notificationService.notifyPromotion(
-                        userId,
-                        "Progression du challenge",
-                        "Challenge paiements carte : " + newCount + " / " + CARD_CHALLENGE_TARGET + "."
-                );
-            }
         }
     }
 
