@@ -1,6 +1,20 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:http/http.dart' as http;
+
+import '../models/partner_establishment.dart';
+import '../models/partner_promotion.dart';
+
+class ApiServiceException implements Exception {
+  final int? statusCode;
+  final String message;
+
+  const ApiServiceException({this.statusCode, required this.message});
+
+  @override
+  String toString() => message;
+}
 
 /// Service centralisé pour tous les appels HTTP vers Spring Boot.
 ///
@@ -18,9 +32,7 @@ class ApiService {
 
   final http.Client _client;
 
-  ApiService({
-    http.Client? client,
-  }) : _client = client ?? http.Client();
+  ApiService({http.Client? client}) : _client = client ?? http.Client();
 
   // ===========================================================
   // POST JSON
@@ -39,28 +51,89 @@ class ApiService {
           },
           body: body == null ? null : jsonEncode(body),
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 30));
   }
 
   // ===========================================================
   // GET
   // ===========================================================
 
-  Future<http.Response> get(
-    String endpoint,
-  ) async {
+  Future<http.Response> get(String endpoint) async {
     return _client
         .get(
           Uri.parse('$baseUrl$endpoint'),
-          headers: {
-            'Accept': 'application/json',
-          },
+          headers: {'Accept': 'application/json'},
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 30));
+  }
+
+  // ===========================================================
+  // BIAT PRIVILÈGES
+  // ===========================================================
+
+  Future<List<PartnerEstablishment>> getPartnerEstablishments() {
+    return _getList(
+      '/api/privileges/establishments',
+      PartnerEstablishment.fromJson,
+    );
+  }
+
+  Future<List<PartnerPromotion>> getPartnerPromotions() {
+    return _getList('/api/privileges/promotions', PartnerPromotion.fromJson);
+  }
+
+  Future<List<T>> _getList<T>(
+    String endpoint,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
+    late final http.Response response;
+
+    try {
+      response = await get(endpoint);
+    } on TimeoutException {
+      throw const ApiServiceException(
+        message: 'Le serveur met trop de temps à répondre.',
+      );
+    } on http.ClientException {
+      throw const ApiServiceException(
+        message: 'Impossible de contacter le serveur.',
+      );
+    }
+
+    if (response.statusCode == 204 || response.body.trim().isEmpty) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return <T>[];
+      }
+    }
+
+    if (response.statusCode != 200) {
+      throw ApiServiceException(
+        statusCode: response.statusCode,
+        message: getErrorMessage(response),
+      );
+    }
+
+    final decoded = decodeResponse(response);
+
+    if (decoded is! List) {
+      throw const ApiServiceException(
+        statusCode: 200,
+        message: 'La réponse du serveur ne contient pas une liste valide.',
+      );
+    }
+
+    return decoded
+        .map((item) {
+          if (item is! Map) {
+            throw const ApiServiceException(
+              statusCode: 200,
+              message: 'Un élément de la réponse du serveur est invalide.',
+            );
+          }
+
+          return fromJson(Map<String, dynamic>.from(item));
+        })
+        .toList(growable: false);
   }
 
   // ===========================================================
@@ -80,28 +153,20 @@ class ApiService {
           },
           body: body == null ? null : jsonEncode(body),
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 15));
   }
 
   // ===========================================================
   // DELETE
   // ===========================================================
 
-  Future<http.Response> delete(
-    String endpoint,
-  ) async {
+  Future<http.Response> delete(String endpoint) async {
     return _client
         .delete(
           Uri.parse('$baseUrl$endpoint'),
-          headers: {
-            'Accept': 'application/json',
-          },
+          headers: {'Accept': 'application/json'},
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 15));
   }
 
   // ===========================================================
@@ -119,12 +184,7 @@ class ApiService {
     required String username,
     required String password,
   }) async {
-    final credentials =
-        base64Encode(
-          utf8.encode(
-            '$username:$password',
-          ),
-        );
+    final credentials = base64Encode(utf8.encode('$username:$password'));
 
     return _client
         .get(
@@ -134,9 +194,7 @@ class ApiService {
             'Authorization': 'Basic $credentials',
           },
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 15));
   }
 
   // ===========================================================
@@ -153,12 +211,7 @@ class ApiService {
     required String username,
     required String password,
   }) async {
-    final credentials =
-        base64Encode(
-          utf8.encode(
-            '$username:$password',
-          ),
-        );
+    final credentials = base64Encode(utf8.encode('$username:$password'));
 
     return _client
         .post(
@@ -168,13 +221,9 @@ class ApiService {
             'Accept': 'application/json',
             'Authorization': 'Basic $credentials',
           },
-          body: body == null
-              ? null
-              : jsonEncode(body),
+          body: body == null ? null : jsonEncode(body),
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 15));
   }
 
   // ===========================================================
@@ -187,12 +236,7 @@ class ApiService {
     required String username,
     required String password,
   }) async {
-    final credentials =
-        base64Encode(
-          utf8.encode(
-            '$username:$password',
-          ),
-        );
+    final credentials = base64Encode(utf8.encode('$username:$password'));
 
     return _client
         .put(
@@ -202,13 +246,9 @@ class ApiService {
             'Accept': 'application/json',
             'Authorization': 'Basic $credentials',
           },
-          body: body == null
-              ? null
-              : jsonEncode(body),
+          body: body == null ? null : jsonEncode(body),
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 15));
   }
 
   // ===========================================================
@@ -220,12 +260,7 @@ class ApiService {
     required String username,
     required String password,
   }) async {
-    final credentials =
-        base64Encode(
-          utf8.encode(
-            '$username:$password',
-          ),
-        );
+    final credentials = base64Encode(utf8.encode('$username:$password'));
 
     return _client
         .delete(
@@ -235,18 +270,14 @@ class ApiService {
             'Authorization': 'Basic $credentials',
           },
         )
-        .timeout(
-          const Duration(seconds: 15),
-        );
+        .timeout(const Duration(seconds: 15));
   }
 
   // ===========================================================
   // JSON RESPONSE
   // ===========================================================
 
-  dynamic decodeResponse(
-    http.Response response,
-  ) {
+  dynamic decodeResponse(http.Response response) {
     if (response.body.isEmpty) {
       return null;
     }
@@ -262,17 +293,13 @@ class ApiService {
   // MESSAGE D'ERREUR
   // ===========================================================
 
-  String getErrorMessage(
-    http.Response response,
-  ) {
+  String getErrorMessage(http.Response response) {
     if (response.body.isEmpty) {
       return 'Erreur du serveur (${response.statusCode}).';
     }
 
     try {
-      final data = jsonDecode(
-        response.body,
-      );
+      final data = jsonDecode(response.body);
 
       if (data is Map<String, dynamic>) {
         if (data['message'] != null) {
