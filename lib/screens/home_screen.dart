@@ -9,6 +9,7 @@ import '../widgets/smartbank_brand.dart';
 import 'payments_screen.dart';
 import 'transactions_screen.dart';
 import 'notifications_screen.dart';
+import 'biat_privileges_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final int userId;
@@ -35,8 +36,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ============================================================
   // SERVICE API
   // ============================================================
@@ -105,9 +105,7 @@ class _HomeScreenState extends State<HomeScreen>
   // ============================================================
 
   @override
-  void didChangeAppLifecycleState(
-    AppLifecycleState state,
-  ) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadAccountAndTransactions();
       _loadRewards();
@@ -138,15 +136,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _refreshInBackground() async {
-    if (!mounted ||
-        _isRefreshing ||
-        _isLoadingTransactions) {
+    if (!mounted || _isRefreshing || _isLoadingTransactions) {
       return;
     }
 
-    await _loadAccountAndTransactions(
-      silent: true,
-    );
+    await _loadAccountAndTransactions(silent: true);
 
     await _loadRewards();
   }
@@ -155,9 +149,7 @@ class _HomeScreenState extends State<HomeScreen>
   // CHARGEMENT COMPTES + TRANSACTIONS
   // ============================================================
 
-  Future<void> _loadAccountAndTransactions({
-    bool silent = false,
-  }) async {
+  Future<void> _loadAccountAndTransactions({bool silent = false}) async {
     if (!mounted) return;
 
     if (!silent) {
@@ -184,18 +176,13 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
 
       if (accountsResponse.statusCode != 200) {
-        throw Exception(
-          'Impossible de récupérer les comptes.',
-        );
+        throw Exception('Impossible de récupérer les comptes.');
       }
 
-      final decodedAccounts =
-          _apiService.decodeResponse(accountsResponse);
+      final decodedAccounts = _apiService.decodeResponse(accountsResponse);
 
       if (decodedAccounts is! List) {
-        throw Exception(
-          'Réponse comptes invalide.',
-        );
+        throw Exception('Réponse comptes invalide.');
       }
 
       Map<String, dynamic>? currentAccount;
@@ -207,21 +194,17 @@ class _HomeScreenState extends State<HomeScreen>
           continue;
         }
 
-        final Map<String, dynamic> accountMap =
-            Map<String, dynamic>.from(account);
+        final Map<String, dynamic> accountMap = Map<String, dynamic>.from(
+          account,
+        );
 
-        final type = (accountMap['type'] ?? '')
-            .toString()
-            .trim()
-            .toUpperCase();
+        final type = (accountMap['type'] ?? '').toString().trim().toUpperCase();
 
-        if (type == 'CURRENT' &&
-            currentAccount == null) {
+        if (type == 'CURRENT' && currentAccount == null) {
           currentAccount = accountMap;
         }
 
-        if (type == 'SAVINGS' &&
-            savingsAccount == null) {
+        if (type == 'SAVINGS' && savingsAccount == null) {
           savingsAccount = accountMap;
         }
       }
@@ -251,19 +234,13 @@ class _HomeScreenState extends State<HomeScreen>
       final accountId = currentAccount['id'];
 
       if (accountId == null) {
-        throw Exception(
-          'ID du compte courant introuvable.',
-        );
+        throw Exception('ID du compte courant introuvable.');
       }
 
-      final parsedAccountId = int.tryParse(
-        accountId.toString(),
-      );
+      final parsedAccountId = int.tryParse(accountId.toString());
 
       if (parsedAccountId == null) {
-        throw Exception(
-          'ID du compte courant invalide.',
-        );
+        throw Exception('ID du compte courant invalide.');
       }
 
       _currentAccountId = parsedAccountId;
@@ -272,16 +249,11 @@ class _HomeScreenState extends State<HomeScreen>
       // 4. SOLDE COURANT
       // ========================================================
 
-      final dynamic rawCurrentBalance =
-          currentAccount['balance'];
+      final dynamic rawCurrentBalance = currentAccount['balance'];
 
-      final double currentBalance =
-          rawCurrentBalance is num
-              ? rawCurrentBalance.toDouble()
-              : double.tryParse(
-                    rawCurrentBalance?.toString() ?? '',
-                  ) ??
-                  0.0;
+      final double currentBalance = rawCurrentBalance is num
+          ? rawCurrentBalance.toDouble()
+          : double.tryParse(rawCurrentBalance?.toString() ?? '') ?? 0.0;
 
       // ========================================================
       // 5. SOLDE ÉPARGNE
@@ -290,28 +262,20 @@ class _HomeScreenState extends State<HomeScreen>
       double savingsBalance = widget.epargneBalance;
 
       if (savingsAccount != null) {
-        final dynamic rawSavingsBalance =
-            savingsAccount['balance'];
+        final dynamic rawSavingsBalance = savingsAccount['balance'];
 
         savingsBalance = rawSavingsBalance is num
             ? rawSavingsBalance.toDouble()
-            : double.tryParse(
-                  rawSavingsBalance?.toString() ?? '',
-                ) ??
-                0.0;
+            : double.tryParse(rawSavingsBalance?.toString() ?? '') ?? 0.0;
       }
 
       // ========================================================
       // REMONTER LES SOLDES
       // ========================================================
 
-      widget.onBalanceChanged?.call(
-        currentBalance,
-      );
+      widget.onBalanceChanged?.call(currentBalance);
 
-      widget.onEpargneBalanceChanged?.call(
-        savingsBalance,
-      );
+      widget.onEpargneBalanceChanged?.call(savingsBalance);
 
       // ========================================================
       // 6. TRANSACTIONS
@@ -324,20 +288,15 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
 
       if (transactionsResponse.statusCode != 200) {
-        throw Exception(
-          'Impossible de récupérer l\'historique.',
-        );
+        throw Exception('Impossible de récupérer l\'historique.');
       }
 
-      final decodedTransactions =
-          _apiService.decodeResponse(
+      final decodedTransactions = _apiService.decodeResponse(
         transactionsResponse,
       );
 
       if (decodedTransactions is! List) {
-        throw Exception(
-          'Réponse historique invalide.',
-        );
+        throw Exception('Réponse historique invalide.');
       }
 
       final List<BankTransaction> loadedTransactions = [];
@@ -347,21 +306,16 @@ class _HomeScreenState extends State<HomeScreen>
           continue;
         }
 
-        final Map<String, dynamic> itemMap =
-            Map<String, dynamic>.from(item);
+        final Map<String, dynamic> itemMap = Map<String, dynamic>.from(item);
 
-        final transaction = _convertTransaction(
-          itemMap,
-        );
+        final transaction = _convertTransaction(itemMap);
 
         if (transaction != null) {
           loadedTransactions.add(transaction);
         }
       }
 
-      loadedTransactions.sort(
-        (a, b) => b.date.compareTo(a.date),
-      );
+      loadedTransactions.sort((a, b) => b.date.compareTo(a.date));
 
       if (!mounted) return;
 
@@ -370,16 +324,12 @@ class _HomeScreenState extends State<HomeScreen>
         _isLoadingTransactions = false;
       });
     } catch (e) {
-      debugPrint(
-        'Erreur chargement HomeScreen : $e',
-      );
+      debugPrint('Erreur chargement HomeScreen : $e');
 
       if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Impossible de charger les informations du compte.',
-            ),
+            content: Text('Impossible de charger les informations du compte.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -419,9 +369,7 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
     } catch (e) {
-      debugPrint(
-        'Erreur chargement rewards : $e',
-      );
+      debugPrint('Erreur chargement rewards : $e');
 
       if (mounted) {
         setState(() {
@@ -435,57 +383,34 @@ class _HomeScreenState extends State<HomeScreen>
   // CONVERSION TRANSACTION
   // ============================================================
 
-  BankTransaction? _convertTransaction(
-    Map<String, dynamic> json,
-  ) {
+  BankTransaction? _convertTransaction(Map<String, dynamic> json) {
     try {
       final int id =
-          int.tryParse(
-            (json['id'] ?? '').toString(),
-          ) ??
+          int.tryParse((json['id'] ?? '').toString()) ??
           DateTime.now().millisecondsSinceEpoch;
 
-      final String type =
-          (json['type'] ?? '')
-              .toString()
-              .toUpperCase();
+      final String type = (json['type'] ?? '').toString().toUpperCase();
 
-      final dynamic rawAmount =
-          json['amount'];
+      final dynamic rawAmount = json['amount'];
 
-      final double amount =
-          rawAmount is num
-              ? rawAmount.toDouble()
-              : double.tryParse(
-                    rawAmount?.toString() ?? '',
-                  ) ??
-                  0.0;
+      final double amount = rawAmount is num
+          ? rawAmount.toDouble()
+          : double.tryParse(rawAmount?.toString() ?? '') ?? 0.0;
 
-      final String label =
-          (json['label'] ?? '')
-              .toString()
-              .trim();
+      final String label = (json['label'] ?? '').toString().trim();
 
-      final String reference =
-          (json['reference'] ?? '')
-              .toString()
-              .trim();
+      final String reference = (json['reference'] ?? '').toString().trim();
 
-      final String relatedAccount =
-          (json['relatedAccountNumber'] ?? '')
-              .toString()
-              .trim();
+      final String relatedAccount = (json['relatedAccountNumber'] ?? '')
+          .toString()
+          .trim();
 
-      final String createdAt =
-          (json['createdAt'] ?? '')
-              .toString();
+      final String createdAt = (json['createdAt'] ?? '').toString();
 
       DateTime date;
 
       try {
-        date = DateTime.parse(
-          createdAt,
-        );
+        date = DateTime.parse(createdAt);
       } catch (_) {
         date = DateTime.now();
       }
@@ -497,9 +422,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (type == 'TRANSFER_OUT') {
         return BankTransaction(
           id: id,
-          title: label.isNotEmpty
-              ? label
-              : 'Virement envoyé',
+          title: label.isNotEmpty ? label : 'Virement envoyé',
           description: relatedAccount.isNotEmpty
               ? 'Vers : $relatedAccount'
               : 'Virement envoyé',
@@ -518,9 +441,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (type == 'TRANSFER_IN') {
         return BankTransaction(
           id: id,
-          title: label.isNotEmpty
-              ? label
-              : 'Virement reçu',
+          title: label.isNotEmpty ? label : 'Virement reçu',
           description: relatedAccount.isNotEmpty
               ? 'Depuis : $relatedAccount'
               : 'Virement reçu',
@@ -539,12 +460,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (type == 'PAYMENT') {
         return BankTransaction(
           id: id,
-          title: label.isNotEmpty
-              ? label
-              : 'Paiement',
-          description: reference.isNotEmpty
-              ? 'Réf : $reference'
-              : 'Paiement',
+          title: label.isNotEmpty ? label : 'Paiement',
+          description: reference.isNotEmpty ? 'Réf : $reference' : 'Paiement',
           amount: amount,
           currency: 'TND',
           date: date,
@@ -560,12 +477,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (type == 'RECHARGE') {
         return BankTransaction(
           id: id,
-          title: label.isNotEmpty
-              ? label
-              : 'Recharge',
-          description: reference.isNotEmpty
-              ? 'Réf : $reference'
-              : 'Recharge',
+          title: label.isNotEmpty ? label : 'Recharge',
+          description: reference.isNotEmpty ? 'Réf : $reference' : 'Recharge',
           amount: amount,
           currency: 'TND',
           date: date,
@@ -580,9 +493,7 @@ class _HomeScreenState extends State<HomeScreen>
 
       return BankTransaction(
         id: id,
-        title: label.isNotEmpty
-            ? label
-            : 'Transaction',
+        title: label.isNotEmpty ? label : 'Transaction',
         description: reference.isNotEmpty
             ? 'Réf : $reference'
             : 'Opération bancaire',
@@ -590,14 +501,10 @@ class _HomeScreenState extends State<HomeScreen>
         currency: 'TND',
         date: date,
         type: TransactionType.expense,
-        category: type.isNotEmpty
-            ? type
-            : 'Autre',
+        category: type.isNotEmpty ? type : 'Autre',
       );
     } catch (e) {
-      debugPrint(
-        'Erreur conversion transaction : $e',
-      );
+      debugPrint('Erreur conversion transaction : $e');
 
       return null;
     }
@@ -635,13 +542,10 @@ class _HomeScreenState extends State<HomeScreen>
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final isDark =
-        theme.brightness == Brightness.dark;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: isDark
@@ -651,7 +555,6 @@ class _HomeScreenState extends State<HomeScreen>
       // ========================================================
       // APP BAR
       // ========================================================
-
       appBar: AppBar(
         backgroundColor: isDark
             ? const Color(0xFF0F1723)
@@ -659,9 +562,7 @@ class _HomeScreenState extends State<HomeScreen>
         elevation: 0,
         centerTitle: false,
         titleSpacing: 20,
-        title: const SmartBankBrand(
-          iconSize: 34,
-        ),
+        title: const SmartBankBrand(iconSize: 34),
         actions: [
           // Notifications
           IconButton(
@@ -671,15 +572,11 @@ class _HomeScreenState extends State<HomeScreen>
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      NotificationsScreen(
-                    userId: widget.userId,
-                  ),
+                      NotificationsScreen(userId: widget.userId),
                 ),
               );
             },
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-            ),
+            icon: const Icon(Icons.notifications_none_rounded),
           ),
 
           // Profil
@@ -688,117 +585,79 @@ class _HomeScreenState extends State<HomeScreen>
             onPressed: () {
               widget.onNavigateTab?.call(4);
             },
-            icon: const Icon(
-              Icons.person_outline_rounded,
-            ),
+            icon: const Icon(Icons.person_outline_rounded),
           ),
 
-          const SizedBox(
-            width: 6,
-          ),
+          const SizedBox(width: 6),
         ],
       ),
 
       // ========================================================
       // BODY
       // ========================================================
-
       body: RefreshIndicator(
         onRefresh: _refreshTransactions,
         color: _blue,
         child: SingleChildScrollView(
-          physics:
-              const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ==================================================
               // CARTE HÉROS
               // ==================================================
-
               _buildHeroCard(isDark),
 
               // ==================================================
               // CONTENU
               // ==================================================
-
               Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  20,
-                  24,
-                  20,
-                  0,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ==================================================
                     // ACTIONS RAPIDES
                     // ==================================================
-
                     Text(
                       'Actions rapides',
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight.w700,
-                        color: isDark
-                            ? Colors.white
-                            : const Color(
-                                0xFF1A2340,
-                              ),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF1A2340),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 14,
-                    ),
+                    const SizedBox(height: 14),
 
-                    _buildQuickActions(
-                      context,
-                    ),
+                    _buildQuickActions(context),
 
-                    const SizedBox(
-                      height: 28,
-                    ),
+                    const SizedBox(height: 12),
+
+                    _buildPrivilegesEntry(context, isDark),
+
+                    const SizedBox(height: 28),
 
                     // ==================================================
                     // RÉCOMPENSES
                     // ==================================================
-
                     _buildRewardsCard(isDark),
 
-                    const SizedBox(
-                      height: 28,
-                    ),
+                    const SizedBox(height: 28),
 
                     // ==================================================
                     // TRANSACTIONS
                     // ==================================================
-
                     Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment
-                              .spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
                           child: Text(
                             'Dernières transactions',
-                            style: theme
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                              fontWeight:
-                                  FontWeight
-                                      .w700,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
                               color: isDark
                                   ? Colors.white
-                                  : const Color(
-                                      0xFF1A2340,
-                                    ),
+                                  : const Color(0xFF1A2340),
                             ),
                           ),
                         ),
@@ -807,45 +666,25 @@ class _HomeScreenState extends State<HomeScreen>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder:
-                                    (context) =>
-                                        TransactionsScreen(
-                                  userId:
-                                      widget
-                                          .userId,
-                                ),
+                                builder: (context) =>
+                                    TransactionsScreen(userId: widget.userId),
                               ),
                             );
                           },
-                          style:
-                              TextButton.styleFrom(
-                            foregroundColor:
-                                _blue,
-                          ),
-                          child:
-                              const Text(
+                          style: TextButton.styleFrom(foregroundColor: _blue),
+                          child: const Text(
                             'Voir tout',
-                            style: TextStyle(
-                              fontWeight:
-                                  FontWeight
-                                      .w600,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(
-                      height: 8,
-                    ),
+                    const SizedBox(height: 8),
 
-                    _buildTransactionsList(
-                      isDark,
-                    ),
+                    _buildTransactionsList(isDark),
 
-                    const SizedBox(
-                      height: 30,
-                    ),
+                    const SizedBox(height: 30),
                   ],
                 ),
               ),
@@ -873,11 +712,9 @@ class _HomeScreenState extends State<HomeScreen>
 
     final points = wallet['pointsBalance'] ?? 0;
 
-    final pending =
-        (wallet['pendingAmountForPoints'] ?? 0).toString();
+    final pending = (wallet['pendingAmountForPoints'] ?? 0).toString();
 
-    final cashback =
-        (wallet['totalCashback'] ?? 0).toString();
+    final cashback = (wallet['totalCashback'] ?? 0).toString();
 
     final billCount = wallet['billChallengeCount'] ?? 0;
 
@@ -887,39 +724,29 @@ class _HomeScreenState extends State<HomeScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1A2340)
-            : Colors.white,
+        color: isDark ? const Color(0xFF1A2340) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: isDark ? 0.20 : 0.05,
-            ),
+            color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.card_giftcard_rounded,
-                color: Color(0xFFF4C542),
-              ),
+              const Icon(Icons.card_giftcard_rounded, color: Color(0xFFF4C542)),
               const SizedBox(width: 8),
               Text(
                 'Mes récompenses',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
-                  color: isDark
-                      ? Colors.white
-                      : const Color(0xFF1A2340),
+                  color: isDark ? Colors.white : const Color(0xFF1A2340),
                 ),
               ),
             ],
@@ -928,18 +755,11 @@ class _HomeScreenState extends State<HomeScreen>
           const SizedBox(height: 14),
 
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _rewardStat('⭐ Points', '$points'),
-              _rewardStat(
-                '💸 Progression',
-                '$pending / 10 DT',
-              ),
-              _rewardStat(
-                '💰 Cashback',
-                '$cashback DT',
-              ),
+              _rewardStat('💸 Progression', '$pending / 10 DT'),
+              _rewardStat('💰 Cashback', '$cashback DT'),
             ],
           ),
 
@@ -950,9 +770,7 @@ class _HomeScreenState extends State<HomeScreen>
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: isDark
-                  ? Colors.white70
-                  : Colors.grey.shade700,
+              color: isDark ? Colors.white70 : Colors.grey.shade700,
             ),
           ),
 
@@ -961,12 +779,9 @@ class _HomeScreenState extends State<HomeScreen>
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: (billCount as num) /
-                  (billTarget as num),
+              value: (billCount as num) / (billTarget as num),
               minHeight: 8,
-              backgroundColor: isDark
-                  ? Colors.white12
-                  : Colors.grey.shade200,
+              backgroundColor: isDark ? Colors.white12 : Colors.grey.shade200,
               color: const Color(0xFF087A5B),
             ),
           ),
@@ -980,18 +795,12 @@ class _HomeScreenState extends State<HomeScreen>
       children: [
         Text(
           value,
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 15,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
         ),
       ],
     );
@@ -1001,46 +810,26 @@ class _HomeScreenState extends State<HomeScreen>
   // CARTE HÉROS SOLDE
   // ============================================================
 
-  Widget _buildHeroCard(
-    bool isDark,
-  ) {
-    final balance =
-        widget.balance;
+  Widget _buildHeroCard(bool isDark) {
+    final balance = widget.balance;
 
-    final epargne =
-        widget.epargneBalance;
+    final epargne = widget.epargneBalance;
 
     return Container(
       width: double.infinity,
-      margin:
-          const EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        0,
-      ),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: BoxDecoration(
-        gradient:
-            const LinearGradient(
-          begin:
-              Alignment.topLeft,
-          end:
-              Alignment.bottomRight,
-          colors: [
-            Color(0xFF0B5AA6),
-            Color(0xFF06457E),
-          ],
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0B5AA6), Color(0xFF06457E)],
         ),
-        borderRadius:
-            BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: _blue.withValues(
-              alpha: 0.35,
-            ),
+            color: _blue.withValues(alpha: 0.35),
             blurRadius: 24,
-            offset:
-                const Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -1053,15 +842,9 @@ class _HomeScreenState extends State<HomeScreen>
             child: Container(
               width: 160,
               height: 160,
-              decoration:
-                  BoxDecoration(
-                shape:
-                    BoxShape.circle,
-                color: Colors.white
-                    .withValues(
-                  alpha:
-                      0.05,
-                ),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -1073,71 +856,41 @@ class _HomeScreenState extends State<HomeScreen>
             child: Container(
               width: 120,
               height: 120,
-              decoration:
-                  BoxDecoration(
-                shape:
-                    BoxShape.circle,
-                color: Colors.white
-                    .withValues(
-                  alpha:
-                      0.04,
-                ),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.04),
               ),
             ),
           ),
 
           Padding(
-            padding:
-                const EdgeInsets.all(
-              24,
-            ),
+            padding: const EdgeInsets.all(24),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ==================================================
                 // SALUTATION
                 // ==================================================
-
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment
-                          .spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           '${_getGreeting()}, ${widget.firstName} 👋',
-                          style:
-                              const TextStyle(
-                            color:
-                                Colors.white,
-                            fontSize:
-                                16,
-                            fontWeight:
-                                FontWeight
-                                    .w600,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(
-                          height: 2,
-                        ),
+                        const SizedBox(height: 2),
                         Text(
                           'Compte courant',
-                          style:
-                              TextStyle(
-                            color: Colors
-                                .white
-                                .withValues(
-                              alpha:
-                                  0.70,
-                            ),
-                            fontSize:
-                                13,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.70),
+                            fontSize: 13,
                           ),
                         ),
                       ],
@@ -1147,38 +900,20 @@ class _HomeScreenState extends State<HomeScreen>
                     GestureDetector(
                       onTap: () {
                         setState(() {
-                          _balanceVisible =
-                              !_balanceVisible;
+                          _balanceVisible = !_balanceVisible;
                         });
                       },
                       child: Container(
-                        padding:
-                            const EdgeInsets
-                                .all(
-                          8,
-                        ),
-                        decoration:
-                            BoxDecoration(
-                          color: Colors
-                              .white
-                              .withValues(
-                            alpha:
-                                0.12,
-                          ),
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            10,
-                          ),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           _balanceVisible
-                              ? Icons
-                                  .visibility_outlined
-                              : Icons
-                                  .visibility_off_outlined,
-                          color:
-                              Colors.white,
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: Colors.white,
                           size: 20,
                         ),
                       ),
@@ -1186,116 +921,70 @@ class _HomeScreenState extends State<HomeScreen>
                   ],
                 ),
 
-                const SizedBox(
-                  height: 20,
-                ),
+                const SizedBox(height: 20),
 
                 // ==================================================
                 // SOLDE PRINCIPAL
                 // ==================================================
-
                 Text(
                   _balanceVisible
                       ? '${balance.toStringAsFixed(2)} TND'
                       : '•••••• TND',
-                  style:
-                      const TextStyle(
-                    color:
-                        Colors.white,
-                    fontSize:
-                        34,
-                    fontWeight:
-                        FontWeight
-                            .w800,
-                    letterSpacing:
-                        -0.5,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 6,
-                ),
+                const SizedBox(height: 6),
 
                 Text(
                   'Solde disponible',
-                  style:
-                      TextStyle(
-                    color: Colors
-                        .white
-                        .withValues(
-                      alpha:
-                          0.70,
-                    ),
-                    fontSize:
-                        13,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.70),
+                    fontSize: 13,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 20,
-                ),
+                const SizedBox(height: 20),
 
                 // ==================================================
                 // SÉPARATEUR
                 // ==================================================
-
                 Container(
                   height: 1,
-                  color: Colors
-                      .white
-                      .withValues(
-                    alpha: 0.15,
-                  ),
+                  color: Colors.white.withValues(alpha: 0.15),
                 ),
 
-                const SizedBox(
-                  height: 16,
-                ),
+                const SizedBox(height: 16),
 
                 // ==================================================
                 // ÉPARGNE
                 // ==================================================
-
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment
-                          .spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Épargne',
-                          style:
-                              TextStyle(
-                            color: Colors
-                                .white
-                                .withValues(
-                              alpha:
-                                  0.70,
-                            ),
-                            fontSize:
-                                12,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.70),
+                            fontSize: 12,
                           ),
                         ),
-                        const SizedBox(
-                          height: 3,
-                        ),
+                        const SizedBox(height: 3),
                         Text(
                           _balanceVisible
                               ? '${epargne.toStringAsFixed(2)} TND'
                               : '•••••• TND',
-                          style:
-                              const TextStyle(
-                            color:
-                                Colors.white,
-                            fontSize:
-                                18,
-                            fontWeight:
-                                FontWeight
-                                    .w700,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -1304,55 +993,26 @@ class _HomeScreenState extends State<HomeScreen>
                     // Voir comptes
                     GestureDetector(
                       onTap: () {
-                        widget
-                            .onNavigateTab
-                            ?.call(1);
+                        widget.onNavigateTab?.call(1);
                       },
-                      child:
-                          Container(
-                        padding:
-                            const EdgeInsets
-                                .symmetric(
-                          horizontal:
-                              14,
-                          vertical:
-                              8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
-                        decoration:
-                            BoxDecoration(
-                          color: Colors
-                              .white
-                              .withValues(
-                            alpha:
-                                0.15,
-                          ),
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            20,
-                          ),
-                          border:
-                              Border.all(
-                            color: Colors
-                                .white
-                                .withValues(
-                              alpha:
-                                  0.25,
-                            ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
                           ),
                         ),
-                        child:
-                            const Text(
+                        child: const Text(
                           'Voir comptes →',
-                          style:
-                              TextStyle(
-                            color:
-                                Colors.white,
-                            fontSize:
-                                12,
-                            fontWeight:
-                                FontWeight
-                                    .w600,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -1371,56 +1031,83 @@ class _HomeScreenState extends State<HomeScreen>
   // ACTIONS RAPIDES
   // ============================================================
 
-  Widget _buildQuickActions(
-    BuildContext context,
-  ) {
-    final isDark =
-        Theme.of(context)
-                .brightness ==
-            Brightness.dark;
-
-    final actions = [
-      _QuickActionData(
-        icon:
-            Icons.swap_horiz_rounded,
-        label:
-            'Virement',
-        color: _blue,
-        onTap: () {
-          widget
-              .onNavigateTab
-              ?.call(2);
-        },
-      ),
-
-      _QuickActionData(
-        icon:
-            Icons.payment_rounded,
-        label:
-            'Paiement',
-        color:
-            const Color(
-          0xFF7C3AED,
-        ),
+  Widget _buildPrivilegesEntry(BuildContext context, bool isDark) {
+    return Material(
+      color: isDark ? const Color(0xFF1A2340) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder:
-                  (context) =>
-                      PaymentsScreen(
-                userId:
-                    widget.userId,
-                courantBalance:
-                    widget.balance,
-                paymentsHistory:
-                    _paymentsHistory,
-                onPaymentSuccess:
-                    (
-                  accountName,
-                  amount,
-                  item,
-                ) {
+              builder: (context) => const BiatPrivilegesScreen(),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4C542).withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.local_offer_outlined,
+                  color: Color(0xFF0B5AA6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'BIAT Privilèges',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final actions = [
+      _QuickActionData(
+        icon: Icons.swap_horiz_rounded,
+        label: 'Virement',
+        color: _blue,
+        onTap: () {
+          widget.onNavigateTab?.call(2);
+        },
+      ),
+
+      _QuickActionData(
+        icon: Icons.payment_rounded,
+        label: 'Paiement',
+        color: const Color(0xFF7C3AED),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PaymentsScreen(
+                userId: widget.userId,
+                courantBalance: widget.balance,
+                paymentsHistory: _paymentsHistory,
+                onPaymentSuccess: (accountName, amount, item) {
                   _refreshTransactions();
                 },
               ),
@@ -1430,34 +1117,20 @@ class _HomeScreenState extends State<HomeScreen>
       ),
 
       _QuickActionData(
-        icon:
-            Icons.credit_card_rounded,
-        label:
-            'Cartes',
-        color:
-            const Color(
-          0xFF0891B2,
-        ),
+        icon: Icons.credit_card_rounded,
+        label: 'Cartes',
+        color: const Color(0xFF0891B2),
         onTap: () {
-          widget
-              .onNavigateTab
-              ?.call(3);
+          widget.onNavigateTab?.call(3);
         },
       ),
 
       _QuickActionData(
-        icon:
-            Icons.account_balance_wallet_rounded,
-        label:
-            'Comptes',
-        color:
-            const Color(
-          0xFF059669,
-        ),
+        icon: Icons.account_balance_wallet_rounded,
+        label: 'Comptes',
+        color: const Color(0xFF059669),
         onTap: () {
-          widget
-              .onNavigateTab
-              ?.call(1);
+          widget.onNavigateTab?.call(1);
         },
       ),
     ];
@@ -1465,21 +1138,10 @@ class _HomeScreenState extends State<HomeScreen>
     return Row(
       children: actions
           .map(
-            (action) =>
-                Expanded(
-              child:
-                  Padding(
-                padding:
-                    const EdgeInsets
-                        .symmetric(
-                  horizontal:
-                      4,
-                ),
-                child:
-                    _buildQuickActionItem(
-                  action,
-                  isDark,
-                ),
+            (action) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: _buildQuickActionItem(action, isDark),
               ),
             ),
           )
@@ -1491,95 +1153,43 @@ class _HomeScreenState extends State<HomeScreen>
   // ITEM ACTION RAPIDE
   // ============================================================
 
-  Widget _buildQuickActionItem(
-    _QuickActionData action,
-    bool isDark,
-  ) {
+  Widget _buildQuickActionItem(_QuickActionData action, bool isDark) {
     return GestureDetector(
-      onTap:
-          action.onTap,
-      child:
-          Container(
-        padding:
-            const EdgeInsets
-                .symmetric(
-          vertical: 14,
-        ),
-        decoration:
-            BoxDecoration(
-          color: isDark
-              ? const Color(
-                  0xFF1A2340,
-                )
-              : Colors.white,
-          borderRadius:
-              BorderRadius.circular(
-            16,
-          ),
+      onTap: action.onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A2340) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black
-                  .withValues(
-                alpha:
-                    isDark
-                        ? 0.20
-                        : 0.06,
-              ),
+              color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.06),
               blurRadius: 10,
-              offset:
-                  const Offset(
-                0,
-                3,
-              ),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 46,
               height: 46,
-              decoration:
-                  BoxDecoration(
-                color: action
-                    .color
-                    .withValues(
-                  alpha: 0.12,
-                ),
-                borderRadius:
-                    BorderRadius
-                        .circular(
-                  14,
-                ),
+              decoration: BoxDecoration(
+                color: action.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                action.icon,
-                color:
-                    action.color,
-                size: 24,
-              ),
+              child: Icon(action.icon, color: action.color, size: 24),
             ),
 
-            const SizedBox(
-              height: 8,
-            ),
+            const SizedBox(height: 8),
 
             Text(
               action.label,
               style: TextStyle(
-                fontSize:
-                    12,
-                fontWeight:
-                    FontWeight
-                        .w600,
-                color: isDark
-                    ? Colors
-                        .white70
-                    : const Color(
-                        0xFF374151,
-                      ),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : const Color(0xFF374151),
               ),
             ),
           ],
@@ -1592,70 +1202,37 @@ class _HomeScreenState extends State<HomeScreen>
   // LISTE TRANSACTIONS
   // ============================================================
 
-  Widget _buildTransactionsList(
-    bool isDark,
-  ) {
+  Widget _buildTransactionsList(bool isDark) {
     if (_isLoadingTransactions) {
       return const Padding(
-        padding:
-            EdgeInsets.symmetric(
-          vertical: 30,
-        ),
-        child: Center(
-          child:
-              CircularProgressIndicator(),
-        ),
+        padding: EdgeInsets.symmetric(vertical: 30),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_transactions.isEmpty) {
       return Container(
-        width:
-            double.infinity,
-        padding:
-            const EdgeInsets
-                .symmetric(
-          vertical: 40,
-        ),
-        decoration:
-            BoxDecoration(
-          color: isDark
-              ? const Color(
-                  0xFF1A2340,
-                )
-              : Colors.white,
-          borderRadius:
-              BorderRadius.circular(
-            16,
-          ),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A2340) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           children: [
             Icon(
-              Icons
-                  .receipt_long_outlined,
+              Icons.receipt_long_outlined,
               size: 48,
-              color: isDark
-                  ? Colors.white24
-                  : Colors.grey.shade300,
+              color: isDark ? Colors.white24 : Colors.grey.shade300,
             ),
 
-            const SizedBox(
-              height: 12,
-            ),
+            const SizedBox(height: 12),
 
             Text(
               'Aucune transaction',
-              style:
-                  TextStyle(
-                color: isDark
-                    ? Colors
-                        .white38
-                    : Colors
-                        .grey
-                        .shade400,
-                fontStyle:
-                    FontStyle.italic,
+              style: TextStyle(
+                color: isDark ? Colors.white38 : Colors.grey.shade400,
+                fontStyle: FontStyle.italic,
               ),
             ),
           ],
@@ -1663,86 +1240,44 @@ class _HomeScreenState extends State<HomeScreen>
       );
     }
 
-    final visibleTransactions =
-        _transactions
-            .take(5)
-            .toList();
+    final visibleTransactions = _transactions.take(5).toList();
 
     return Container(
-      decoration:
-          BoxDecoration(
-        color: isDark
-            ? const Color(
-                0xFF1A2340,
-              )
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          16,
-        ),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A2340) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black
-                .withValues(
-              alpha: isDark
-                  ? 0.20
-                  : 0.05,
-            ),
+            color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.05),
             blurRadius: 10,
-            offset:
-                const Offset(
-              0,
-              3,
-            ),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
-        children: visibleTransactions
-            .asMap()
-            .entries
-            .map(
-              (entry) {
-                final index =
-                    entry.key;
+        children: visibleTransactions.asMap().entries.map((entry) {
+          final index = entry.key;
 
-                final tx =
-                    entry.value;
+          final tx = entry.value;
 
-                final isLast =
-                    index ==
-                        visibleTransactions
-                                .length -
-                            1;
+          final isLast = index == visibleTransactions.length - 1;
 
-                return Column(
-                  children: [
-                    _buildTransactionTile(
-                      tx,
-                      isDark,
-                    ),
+          return Column(
+            children: [
+              _buildTransactionTile(tx, isDark),
 
-                    if (!isLast)
-                      Divider(
-                        height: 1,
-                        indent: 70,
-                        endIndent: 16,
-                        color: isDark
-                            ? Colors
-                                .white
-                                .withValues(
-                              alpha:
-                                  0.06,
-                            )
-                            : Colors
-                                .grey
-                                .shade100,
-                      ),
-                  ],
-                );
-              },
-            )
-            .toList(),
+              if (!isLast)
+                Divider(
+                  height: 1,
+                  indent: 70,
+                  endIndent: 16,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.grey.shade100,
+                ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -1751,34 +1286,14 @@ class _HomeScreenState extends State<HomeScreen>
   // TRANSACTION TILE
   // ============================================================
 
-  Widget _buildTransactionTile(
-    BankTransaction tx,
-    bool isDark,
-  ) {
-    final isIncome =
-        tx.type ==
-            TransactionType
-                .income;
+  Widget _buildTransactionTile(BankTransaction tx, bool isDark) {
+    final isIncome = tx.type == TransactionType.income;
 
-    final color = isIncome
-        ? const Color(
-            0xFF059669,
-          )
-        : const Color(
-            0xFFDC2626,
-          );
+    final color = isIncome ? const Color(0xFF059669) : const Color(0xFFDC2626);
 
     final bgColor = isIncome
-        ? const Color(
-                0xFF059669)
-            .withValues(
-            alpha: 0.10,
-          )
-        : const Color(
-                0xFFDC2626)
-            .withValues(
-            alpha: 0.10,
-          );
+        ? const Color(0xFF059669).withValues(alpha: 0.10)
+        : const Color(0xFFDC2626).withValues(alpha: 0.10);
 
     // ==========================================================
     // ICÔNE SELON LE TYPE
@@ -1786,156 +1301,93 @@ class _HomeScreenState extends State<HomeScreen>
 
     IconData icon;
 
-    if (tx.category ==
-        'Virement') {
+    if (tx.category == 'Virement') {
       icon = isIncome
-          ? Icons
-              .arrow_downward_rounded
-          : Icons
-              .arrow_upward_rounded;
-    } else if (tx.category ==
-        'Paiement') {
-      icon =
-          Icons.payment_rounded;
-    } else if (tx.category ==
-        'Recharge') {
-      icon =
-          Icons.phone_android_rounded;
+          ? Icons.arrow_downward_rounded
+          : Icons.arrow_upward_rounded;
+    } else if (tx.category == 'Paiement') {
+      icon = Icons.payment_rounded;
+    } else if (tx.category == 'Recharge') {
+      icon = Icons.phone_android_rounded;
     } else {
-      icon =
-          Icons.receipt_outlined;
+      icon = Icons.receipt_outlined;
     }
 
     // ==========================================================
     // DATE
     // ==========================================================
 
-    final day = tx.date.day
-        .toString()
-        .padLeft(2, '0');
+    final day = tx.date.day.toString().padLeft(2, '0');
 
-    final month = tx.date.month
-        .toString()
-        .padLeft(2, '0');
+    final month = tx.date.month.toString().padLeft(2, '0');
 
-    final hour = tx.date.hour
-        .toString()
-        .padLeft(2, '0');
+    final hour = tx.date.hour.toString().padLeft(2, '0');
 
-    final minute = tx.date.minute
-        .toString()
-        .padLeft(2, '0');
+    final minute = tx.date.minute.toString().padLeft(2, '0');
 
     // ==========================================================
     // TILE
     // ==========================================================
 
     return Padding(
-      padding:
-          const EdgeInsets
-              .symmetric(
-        horizontal: 16,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           // Icône
           Container(
             width: 44,
             height: 44,
-            decoration:
-                BoxDecoration(
+            decoration: BoxDecoration(
               color: bgColor,
-              borderRadius:
-                  BorderRadius
-                      .circular(
-                12,
-              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 22,
-            ),
+            child: Icon(icon, color: color, size: 22),
           ),
 
-          const SizedBox(
-            width: 12,
-          ),
+          const SizedBox(width: 12),
 
           // Description
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   tx.title,
                   maxLines: 1,
-                  overflow:
-                      TextOverflow
-                          .ellipsis,
-                  style:
-                      TextStyle(
-                    fontWeight:
-                        FontWeight
-                            .w600,
-                    fontSize:
-                        14,
-                    color: isDark
-                        ? Colors
-                            .white
-                        : const Color(
-                            0xFF111827,
-                          ),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: isDark ? Colors.white : const Color(0xFF111827),
                   ),
                 ),
 
-                const SizedBox(
-                  height: 3,
-                ),
+                const SizedBox(height: 3),
 
                 Text(
                   '$day/$month • $hour:$minute',
-                  style:
-                      TextStyle(
-                    fontSize:
-                        12,
-                    color: isDark
-                        ? Colors
-                            .white38
-                        : Colors
-                            .grey
-                            .shade500,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white38 : Colors.grey.shade500,
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
 
           // Montant
           Flexible(
             child: Text(
               '${isIncome ? '+' : '-'} ${tx.amount.toStringAsFixed(2)} TND',
               maxLines: 1,
-              overflow:
-                  TextOverflow
-                      .ellipsis,
-              textAlign:
-                  TextAlign.end,
-              style:
-                  TextStyle(
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(
                 color: color,
-                fontWeight:
-                    FontWeight
-                        .w700,
-                fontSize:
-                    14,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
           ),
@@ -1952,8 +1404,7 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _stopAutoRefresh();
 
-    WidgetsBinding.instance
-        .removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
 
     _apiService.dispose();
 
