@@ -4,6 +4,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val googleMapsApiKey = providers.gradleProperty("GOOGLE_MAPS_API_KEY")
+    .orElse(providers.environmentVariable("GOOGLE_MAPS_API_KEY"))
+    .getOrElse("")
+
 android {
     namespace = "com.example.banking_app"
 compileSdk = 37
@@ -19,10 +23,11 @@ compileSdk = 37
         applicationId = "com.example.banking_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {

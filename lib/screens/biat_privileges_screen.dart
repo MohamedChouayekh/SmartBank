@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/partner_promotion.dart';
 import '../services/api_service.dart';
+import 'biat_privileges_map_screen.dart';
 
 class BiatPrivilegesScreen extends StatefulWidget {
   const BiatPrivilegesScreen({super.key});
@@ -70,7 +71,23 @@ class _BiatPrivilegesScreenState extends State<BiatPrivilegesScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('BIAT Privilèges')),
+      appBar: AppBar(
+        title: const Text('BIAT Privilèges'),
+        actions: [
+          IconButton(
+            tooltip: 'Voir sur la carte',
+            icon: const Icon(Icons.map_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BiatPrivilegesMapScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _loadPromotions,
         child: _buildContent(theme),
