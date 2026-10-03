@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/partner_establishment.dart';
 import '../models/partner_promotion.dart';
@@ -15,12 +16,12 @@ class BiatPrivilegesMapScreen extends StatefulWidget {
 
 class _BiatPrivilegesMapScreenState extends State<BiatPrivilegesMapScreen> {
   final ApiService _apiService = ApiService();
+  final MapController _mapController = MapController();
 
   List<PartnerEstablishment> _establishments = [];
   List<PartnerPromotion> _promotions = [];
   bool _isLoading = true;
   String? _errorMessage;
-  int _mapGeneration = 0;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _BiatPrivilegesMapScreenState extends State<BiatPrivilegesMapScreen> {
   @override
   void dispose() {
     _apiService.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -60,7 +62,6 @@ class _BiatPrivilegesMapScreenState extends State<BiatPrivilegesMapScreen> {
       setState(() {
         _establishments = establishments;
         _promotions = promotions;
-        _mapGeneration++;
         _isLoading = false;
       });
     } on ApiServiceException catch (error) {
@@ -122,57 +123,72 @@ class _BiatPrivilegesMapScreenState extends State<BiatPrivilegesMapScreen> {
       );
     }
 
-    final firstEstablishment = _establishments.first;
+    final coordinates = _establishments
+        .map((establishment) => _toLatLng(establishment))
+        .toList(growable: false);
+    final south = coordinates
+        .map((point) => point.latitude)
+        .reduce((first, second) => first < second ? first : second);
+    final north = coordinates
+        .map((point) => point.latitude)
+        .reduce((first, second) => first > second ? first : second);
+    final west = coordinates
+        .map((point) => point.longitude)
+        .reduce((first, second) => first < second ? first : second);
+    final east = coordinates
+        .map((point) => point.longitude)
+        .reduce((first, second) => first > second ? first : second);
+    final canFitBounds = coordinates.length > 1 && south < north && west < east;
 
-    return GoogleMap(
-      key: ValueKey(_mapGeneration),
-      initialCameraPosition: CameraPosition(
-        target: LatLng(
-          firstEstablishment.latitude,
-          firstEstablishment.longitude,
-        ),
-        zoom: _establishments.length == 1 ? 14 : 7,
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: LatLng((south + north) / 2, (west + east) / 2),
+        initialZoom: coordinates.length == 1 ? 14 : 9,
+        initialCameraFit: canFitBounds
+            ? CameraFit.coordinates(
+                coordinates: coordinates,
+                padding: const EdgeInsets.all(48),
+                maxZoom: 14,
+              )
+            : null,
       ),
-      markers: _establishments.map(_buildMarker).toSet(),
-      onMapCreated: _fitAllMarkers,
-      mapToolbarEnabled: false,
-      myLocationButtonEnabled: false,
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.banking_app',
+          maxNativeZoom: 19,
+        ),
+        MarkerLayer(
+          markers: _establishments.map(_buildMarker).toList(growable: false),
+        ),
+        SimpleAttributionWidget(
+          alignment: Alignment.bottomRight,
+          source: const Text('OpenStreetMap contributors'),
+        ),
+      ],
     );
   }
 
   Marker _buildMarker(PartnerEstablishment establishment) {
     return Marker(
-      markerId: MarkerId('partner-establishment-${establishment.id}'),
-      position: LatLng(establishment.latitude, establishment.longitude),
-      infoWindow: InfoWindow(
-        title: establishment.name,
-        snippet: '${establishment.category} · ${establishment.city}',
+      key: ValueKey('partner-establishment-${establishment.id}'),
+      point: _toLatLng(establishment),
+      width: 48,
+      height: 48,
+      alignment: Alignment.bottomCenter,
+      child: IconButton(
+        key: ValueKey('partner-establishment-marker-${establishment.id}'),
+        tooltip: establishment.name,
+        padding: EdgeInsets.zero,
+        icon: const Icon(Icons.location_on, size: 38, color: Color(0xFF0B5AA6)),
+        onPressed: () => _showEstablishmentDetails(establishment),
       ),
-      onTap: () => _showEstablishmentDetails(establishment),
     );
   }
 
-  void _fitAllMarkers(GoogleMapController controller) {
-    if (_establishments.length < 2) return;
-
-    final latitudes = _establishments.map((item) => item.latitude);
-    final longitudes = _establishments.map((item) => item.longitude);
-    final south = latitudes.reduce((a, b) => a < b ? a : b);
-    final north = latitudes.reduce((a, b) => a > b ? a : b);
-    final west = longitudes.reduce((a, b) => a < b ? a : b);
-    final east = longitudes.reduce((a, b) => a > b ? a : b);
-
-    if (south == north || west == east) return;
-
-    controller.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(south, west),
-          northeast: LatLng(north, east),
-        ),
-        48,
-      ),
-    );
+  LatLng _toLatLng(PartnerEstablishment establishment) {
+    return LatLng(establishment.latitude, establishment.longitude);
   }
 
   void _showEstablishmentDetails(PartnerEstablishment establishment) {
