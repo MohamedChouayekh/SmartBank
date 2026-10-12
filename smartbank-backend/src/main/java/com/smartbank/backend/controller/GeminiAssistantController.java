@@ -22,7 +22,7 @@ public class GeminiAssistantController {
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static final String API_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
 
     private static final String CONTEXT = """
         Tu es SmartBank Assistant, l'assistant pédagogique d'une
