@@ -100,6 +100,19 @@ public class GeminiAssistantController {
             return ResponseEntity.ok(new ChatResponse(text.asText()));
 
         } catch (Exception e) {
+            System.err.println("SmartBank Gemini exception type: "
+                    + e.getClass().getName());
+
+            if (e instanceof org.springframework.web.client.RestClientResponseException ex) {
+                String errorBody = ex.getResponseBodyAsString();
+                if (errorBody.length() > 1000) {
+                    errorBody = errorBody.substring(0, 1000);
+                }
+                System.err.println("Gemini HTTP status: "
+                        + ex.getStatusCode().value());
+                System.err.println("Gemini response: " + errorBody);
+            }
+
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(new ChatResponse(
                             "Le service IA est momentanément indisponible."));
